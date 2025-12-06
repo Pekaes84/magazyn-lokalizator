@@ -3,9 +3,12 @@ import { externalSupabase } from "@/lib/externalSupabase";
 
 export interface InventoryItem {
   id: string;
-  sku: string;
-  location: string;
-  last_updated: string;
+  Symbol: string;
+  "Kod kreskowy": string | null;
+  Nazwa: string | null;
+  Kontener: string | null;
+  Regał: string | null;
+  Półka: string | null;
 }
 
 export function useInventorySearch(searchTerm: string) {
@@ -19,8 +22,8 @@ export function useInventorySearch(searchTerm: string) {
       const { data, error } = await externalSupabase
         .from("Lokalizacje")
         .select("*")
-        .ilike("sku", `%${searchTerm}%`)
-        .order("sku")
+        .ilike("Symbol", `%${searchTerm}%`)
+        .order("Symbol")
         .limit(50);
 
       if (error) {

@@ -17,7 +17,7 @@ interface InventoryFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item?: InventoryItem | null;
-  onSave: (data: { sku: string; location: string }) => void;
+  onSave: (data: { symbol: string; nazwa: string; kontener: string; regal: string; polka: string }) => void;
   isLoading?: boolean;
 }
 
@@ -28,23 +28,38 @@ export function InventoryFormDialog({
   onSave,
   isLoading,
 }: InventoryFormDialogProps) {
-  const [sku, setSku] = useState("");
-  const [location, setLocation] = useState("");
+  const [symbol, setSymbol] = useState("");
+  const [nazwa, setNazwa] = useState("");
+  const [kontener, setKontener] = useState("");
+  const [regal, setRegal] = useState("");
+  const [polka, setPolka] = useState("");
 
   useEffect(() => {
     if (item) {
-      setSku(item.sku);
-      setLocation(item.location);
+      setSymbol(item.Symbol);
+      setNazwa(item.Nazwa || "");
+      setKontener(item.Kontener || "");
+      setRegal(item.Regał || "");
+      setPolka(item.Półka || "");
     } else {
-      setSku("");
-      setLocation("");
+      setSymbol("");
+      setNazwa("");
+      setKontener("");
+      setRegal("");
+      setPolka("");
     }
   }, [item, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (sku.trim() && location.trim()) {
-      onSave({ sku: sku.trim(), location: location.trim() });
+    if (symbol.trim()) {
+      onSave({ 
+        symbol: symbol.trim(), 
+        nazwa: nazwa.trim(),
+        kontener: kontener.trim(), 
+        regal: regal.trim(), 
+        polka: polka.trim() 
+      });
     }
   };
 
@@ -68,27 +83,52 @@ export function InventoryFormDialog({
         <form onSubmit={handleSubmit}>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="sku">Nazwa towaru / SKU</Label>
+              <Label htmlFor="symbol">Symbol *</Label>
               <Input
-                id="sku"
-                placeholder="np. Różaniec drewniany 5mm"
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
+                id="symbol"
+                placeholder="np. 1003"
+                value={symbol}
+                onChange={(e) => setSymbol(e.target.value)}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="location">Lokalizacja</Label>
+              <Label htmlFor="nazwa">Nazwa</Label>
               <Input
-                id="location"
-                placeholder="np. A-01-01"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                required
+                id="nazwa"
+                placeholder="np. Różaniec drewniany"
+                value={nazwa}
+                onChange={(e) => setNazwa(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">
-                Format: Sekcja-Regał-Półka (np. A-01-01)
-              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="kontener">Kontener</Label>
+                <Input
+                  id="kontener"
+                  placeholder="np. K01"
+                  value={kontener}
+                  onChange={(e) => setKontener(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="regal">Regał</Label>
+                <Input
+                  id="regal"
+                  placeholder="np. R01"
+                  value={regal}
+                  onChange={(e) => setRegal(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="polka">Półka</Label>
+                <Input
+                  id="polka"
+                  placeholder="np. P01"
+                  value={polka}
+                  onChange={(e) => setPolka(e.target.value)}
+                />
+              </div>
             </div>
           </div>
 

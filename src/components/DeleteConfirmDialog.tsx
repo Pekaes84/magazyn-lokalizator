@@ -34,8 +34,8 @@ export function DeleteConfirmDialog({
           </AlertDialogTitle>
           <AlertDialogDescription>
             Czy na pewno chcesz usunąć towar{" "}
-            <span className="font-semibold">"{item?.sku}"</span> z lokalizacji{" "}
-            <span className="font-mono font-semibold">{item?.location}</span>?
+            <span className="font-semibold">"{item?.Nazwa || item?.Symbol}"</span>?
+            <br />
             <br />
             <br />
             Ta operacja jest nieodwracalna.
