@@ -133,7 +133,7 @@ export function InventoryRow({ item, isAdmin, onEdit, onDelete }: InventoryRowPr
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span>Sprawdzanie dostępności...</span>
                   </div>
-                ) : productDetails ? (
+                ) : productDetails?.availability ? (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Status:</span>
                     <span
@@ -158,7 +158,7 @@ export function InventoryRow({ item, isAdmin, onEdit, onDelete }: InventoryRowPr
                   className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
                 >
                   <ExternalLink className="w-4 h-4" />
-                  Zobacz na jakobczak.pl
+                  {productDetails.success ? "Zobacz na jakobczak.pl" : "Szukaj na jakobczak.pl"}
                 </a>
               )}
             </div>
@@ -180,6 +180,16 @@ export function InventoryRow({ item, isAdmin, onEdit, onDelete }: InventoryRowPr
                     (e.target as HTMLImageElement).style.display = "none";
                   }}
                 />
+              ) : productDetails?.productUrl ? (
+                <a
+                  href={productDetails.productUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-32 bg-muted rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/80 transition-colors cursor-pointer gap-2"
+                >
+                  <ExternalLink className="w-6 h-6" />
+                  <span className="text-sm">Zobacz na stronie</span>
+                </a>
               ) : (
                 <div className="h-32 bg-muted rounded-lg flex items-center justify-center text-muted-foreground">
                   <Package className="w-8 h-8" />
