@@ -6,9 +6,9 @@ export interface ProductDetails {
   productUrl: string | null;
 }
 
-export async function scrapeProductDetails(productName: string): Promise<ProductDetails> {
+export async function scrapeProductDetails(productName: string, productSymbol?: string): Promise<ProductDetails> {
   const { data, error } = await supabase.functions.invoke('scrape-product-details', {
-    body: { productName }
+    body: { productName, productSymbol }
   });
 
   if (error) {
