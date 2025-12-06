@@ -17,7 +17,7 @@ export function useInventorySearch(searchTerm: string) {
       }
 
       const { data, error } = await externalSupabase
-        .from("inventory")
+        .from("Lokalizacje")
         .select("*")
         .ilike("sku", `%${searchTerm}%`)
         .order("sku")
@@ -39,7 +39,7 @@ export function useInventoryById(id: string) {
     queryKey: ["inventory", "single", id],
     queryFn: async () => {
       const { data, error } = await externalSupabase
-        .from("inventory")
+        .from("Lokalizacje")
         .select("*")
         .eq("id", id)
         .maybeSingle();
