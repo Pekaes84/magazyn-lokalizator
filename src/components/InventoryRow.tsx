@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, MapPin, Package, Loader2, ExternalLink, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, MapPin, Package, Loader2, Pencil, Trash2, ImageOff } from "lucide-react";
 import { scrapeProductDetails } from "@/lib/scraper";
 import { InventoryItem } from "@/hooks/useInventory";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 interface InventoryRowProps {
   item: InventoryItem;
@@ -12,7 +13,6 @@ interface InventoryRowProps {
   onDelete?: (item: InventoryItem) => void;
 }
 
-// Helper to build location string from components
 function buildLocation(item: InventoryItem): string {
   const parts = [item.Kontener, item.Regał, item.Półka].filter(Boolean);
   return parts.length > 0 ? parts.join(" / ") : "Brak lokalizacji";
@@ -25,10 +25,29 @@ export function InventoryRow({ item, isAdmin, onEdit, onDelete }: InventoryRowPr
     queryKey: ["productDetails", item.Symbol],
     queryFn: () => scrapeProductDetails(item.Nazwa || item.Symbol, item.Symbol),
     enabled: isExpanded,
-    staleTime: 1000 * 60 * 10, // 10 minutes
+    staleTime: 1000 * 60 * 10,
   });
 
   const location = buildLocation(item);
+
+  const getAvailabilityBadge = () => {
+    if (!productDetails?.availability) return null;
+    
+    const variant = productDetails.availability === "Dostępny" 
+      ? "default" 
+      : productDetails.availability === "Niedostępny" 
+        ? "destructive" 
+        : "secondary";
+    
+    return (
+      <Badge 
+        variant={variant}
+        className={productDetails.availability === "Dostępny" ? "bg-green-600 hover:bg-green-700" : ""}
+      >
+        {productDetails.availability}
+      </Badge>
+    );
+  };
 
   return (
     <div className="border border-border rounded-lg overflow-hidden bg-card transition-all hover:shadow-md">
@@ -95,6 +114,7 @@ export function InventoryRow({ item, isAdmin, onEdit, onDelete }: InventoryRowPr
       {isExpanded && (
         <div className="border-t border-border bg-muted/30 p-4 animate-slide-up">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Product Details */}
             <div className="space-y-3">
               <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
                 Szczegóły produktu
@@ -128,73 +148,57 @@ export function InventoryRow({ item, isAdmin, onEdit, onDelete }: InventoryRowPr
                     <span className="font-mono font-bold text-primary">{item.Półka}</span>
                   </div>
                 )}
-                {isLoadingDetails ? (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Sprawdzanie dostępności...</span>
-                  </div>
-                ) : productDetails?.availability ? (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Status:</span>
-                    <span
-                      className={`font-medium ${
-                        productDetails.availability === "Dostępny"
-                          ? "text-green-600"
-                          : productDetails.availability === "Niedostępny"
-                          ? "text-red-500"
-                          : "text-amber-600"
-                      }`}
-                    >
-                      {productDetails.availability}
-                    </span>
-                  </div>
-                ) : null}
+                
+                {/* Availability Status */}
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-muted-foreground">Status:</span>
+                  {isLoadingDetails ? (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm">Sprawdzanie...</span>
+                    </div>
+                  ) : (
+                    getAvailabilityBadge() || (
+                      <Badge variant="outline">Brak danych</Badge>
+                    )
+                  )}
+                </div>
               </div>
-              {productDetails?.productUrl && (
-                <a
-                  href={productDetails.productUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  {productDetails.success ? "Zobacz na jakobczak.pl" : "Szukaj na jakobczak.pl"}
-                </a>
-              )}
             </div>
 
+            {/* Product Image */}
             <div className="space-y-3">
               <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">
                 Podgląd
               </h4>
-              {isLoadingDetails ? (
-                <div className="h-32 bg-muted rounded-lg flex items-center justify-center">
-                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : productDetails?.imageUrl ? (
-                <img
-                  src={productDetails.imageUrl}
-                  alt={item.Nazwa || item.Symbol}
-                  className="w-full max-w-[200px] h-auto rounded-lg border border-border shadow-sm"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              ) : productDetails?.productUrl ? (
-                <a
-                  href={productDetails.productUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="h-32 bg-muted rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:bg-muted/80 transition-colors cursor-pointer gap-2"
-                >
-                  <ExternalLink className="w-6 h-6" />
-                  <span className="text-sm">Zobacz na stronie</span>
-                </a>
-              ) : (
-                <div className="h-32 bg-muted rounded-lg flex items-center justify-center text-muted-foreground">
-                  <Package className="w-8 h-8" />
-                </div>
-              )}
+              <div className="aspect-square max-w-[200px] rounded-lg border border-border overflow-hidden bg-muted">
+                {isLoadingDetails ? (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : productDetails?.imageUrl ? (
+                  <img
+                    src={productDetails.imageUrl}
+                    alt={item.Nazwa || item.Symbol}
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = "none";
+                      target.parentElement!.innerHTML = `
+                        <div class="w-full h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="2" y2="22"/><path d="M10.41 10.41a2 2 0 1 1-2.83-2.83"/><line x1="13.5" x2="6" y1="13.5" y2="21"/><line x1="18" x2="21" y1="12" y2="15"/><path d="M3.59 3.59A1.99 1.99 0 0 0 3 5v14a2 2 0 0 0 2 2h14c.55 0 1.052-.22 1.41-.59"/><path d="M21 15V5a2 2 0 0 0-2-2H9"/></svg>
+                          <span class="text-xs">Błąd ładowania</span>
+                        </div>
+                      `;
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
+                    <ImageOff className="w-8 h-8" />
+                    <span className="text-xs">Brak zdjęcia</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

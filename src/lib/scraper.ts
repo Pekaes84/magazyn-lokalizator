@@ -4,34 +4,25 @@ export interface ProductDetails {
   success: boolean;
   imageUrl: string | null;
   availability: string | null;
-  productUrl: string | null;
-  searchTerm?: string;
 }
 
 export async function scrapeProductDetails(productName: string, productSymbol?: string): Promise<ProductDetails> {
-  console.log(`[Scraper] Fetching details for: ${productName}, symbol: ${productSymbol}`);
+  console.log(`[Scraper] Fetching details for symbol: ${productSymbol}, name: ${productName}`);
   
   const { data, error } = await supabase.functions.invoke('scrape-product-details', {
     body: { productName, productSymbol }
   });
 
-  console.log('[Scraper] Response:', { data, error });
+  console.log('[Scraper] Edge function response:', data, error);
 
   if (error) {
-    console.error('[Scraper] Error calling scrape function:', error);
-    return {
-      success: false,
-      imageUrl: null,
-      availability: null,
-      productUrl: `https://jakobczak.pl/szukaj?q=${encodeURIComponent(productSymbol || productName)}`
-    };
+    console.error('[Scraper] Error:', error);
+    return { success: false, imageUrl: null, availability: null };
   }
 
   return {
     success: data?.success ?? false,
     imageUrl: data?.imageUrl || null,
     availability: data?.availability || null,
-    productUrl: data?.productUrl || `https://jakobczak.pl/szukaj?q=${encodeURIComponent(productSymbol || productName)}`,
-    searchTerm: data?.searchTerm
   };
 }

@@ -6,23 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const browserHeaders = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-  'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
-  'Accept-Encoding': 'gzip, deflate, br',
-  'Cache-Control': 'max-age=0',
-  'Connection': 'keep-alive',
-  'Sec-Ch-Ua': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
-  'Sec-Ch-Ua-Mobile': '?0',
-  'Sec-Ch-Ua-Platform': '"Windows"',
-  'Sec-Fetch-Dest': 'document',
-  'Sec-Fetch-Mode': 'navigate',
-  'Sec-Fetch-Site': 'none',
-  'Sec-Fetch-User': '?1',
-  'Upgrade-Insecure-Requests': '1',
-};
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -35,200 +18,167 @@ serve(async (req) => {
     if (!searchTerm) {
       console.error('No search term provided');
       return new Response(
-        JSON.stringify({ success: false, error: 'Brak nazwy produktu', imageUrl: null, availability: null, productUrl: null }),
+        JSON.stringify({ success: false, imageUrl: null, availability: null }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Searching for: ${searchTerm}`);
+    console.log(`[SCRAPER] Searching for: "${searchTerm}"`);
 
-    // Try multiple URL formats
-    const searchUrls = [
-      `https://jakobczak.pl/szukaj?q=${encodeURIComponent(searchTerm)}`,
-      `https://jakobczak.pl/szukaj?s=${encodeURIComponent(searchTerm)}`,
-      `https://jakobczak.pl/search?q=${encodeURIComponent(searchTerm)}`,
-    ];
+    // PrestaShop standard search URL
+    const searchUrl = `https://jakobczak.pl/szukaj?controller=search&s=${encodeURIComponent(searchTerm)}`;
+    console.log(`[SCRAPER] Fetching: ${searchUrl}`);
 
-    let html = '';
-    let successfulUrl = '';
-    
-    for (const url of searchUrls) {
-      console.log(`Trying URL: ${url}`);
-      try {
-        const response = await fetch(url, { headers: browserHeaders });
-        console.log(`Response status for ${url}: ${response.status}`);
-        
-        if (response.ok) {
-          html = await response.text();
-          successfulUrl = url;
-          console.log(`Success! Got ${html.length} bytes from ${url}`);
-          break;
-        }
-      } catch (e) {
-        console.log(`Failed to fetch ${url}: ${e}`);
-      }
-    }
+    const response = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0',
+      },
+    });
 
-    if (!html) {
-      console.log('All search URLs failed, returning fallback');
+    console.log(`[SCRAPER] Response status: ${response.status}`);
+
+    if (!response.ok) {
+      console.error(`[SCRAPER] HTTP error: ${response.status}`);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          imageUrl: null, 
-          availability: null, 
-          productUrl: `https://jakobczak.pl/szukaj?q=${encodeURIComponent(searchTerm)}`,
-          searchTerm 
-        }),
+        JSON.stringify({ success: false, imageUrl: null, availability: null, error: `HTTP ${response.status}` }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Parse HTML with cheerio
+    const html = await response.text();
+    console.log(`[SCRAPER] Received ${html.length} bytes of HTML`);
+
     const $ = cheerio.load(html);
     
     let imageUrl: string | null = null;
     let availability: string | null = null;
-    let productUrl: string | null = null;
 
-    // Strategy 1: Try og:image meta tag
-    const ogImage = $('meta[property="og:image"]').attr('content');
-    if (ogImage && !ogImage.includes('logo')) {
-      imageUrl = ogImage;
-      console.log(`Found og:image: ${imageUrl}`);
+    // Find first product container (PrestaShop selectors)
+    const productSelectors = [
+      'article.product-miniature',
+      '.product-miniature',
+      '.product-container',
+      '.product-item',
+      '.js-product-miniature',
+      '[data-id-product]',
+      '.products article',
+      '.product-grid article',
+    ];
+
+    let productContainer = null;
+    for (const selector of productSelectors) {
+      productContainer = $(selector).first();
+      if (productContainer.length > 0) {
+        console.log(`[SCRAPER] Found product with selector: ${selector}`);
+        break;
+      }
     }
 
-    // Strategy 2: Try common product image selectors
-    if (!imageUrl) {
-      const imageSelectors = [
-        '.product-image img',
-        '.product-thumbnail img',
-        '.product-miniature img',
-        '.product-cover img',
-        '.js-qv-product-cover',
-        '[data-id-product] img',
-        '.thumbnail-container img',
-        '.product-images img',
-        'article.product-miniature img',
-        '.products img',
+    if (productContainer && productContainer.length > 0) {
+      // Extract image from product container
+      const img = productContainer.find('img').first();
+      const imgSrc = img.attr('data-full-size-image-url') || 
+                     img.attr('data-src') || 
+                     img.attr('src');
+      
+      if (imgSrc) {
+        imageUrl = imgSrc.startsWith('http') ? imgSrc : `https://jakobczak.pl${imgSrc.startsWith('/') ? '' : '/'}${imgSrc}`;
+        console.log(`[SCRAPER] Found image: ${imageUrl}`);
+      }
+
+      // Extract availability from product container
+      const availabilitySelectors = [
+        '.availability',
+        '.stock',
+        '.product-availability',
+        '[data-stock]',
+        '.available',
+        '.in-stock',
+        '.out-of-stock',
       ];
 
-      for (const selector of imageSelectors) {
+      for (const selector of availabilitySelectors) {
+        const availEl = productContainer.find(selector);
+        if (availEl.length > 0) {
+          const text = availEl.text().trim().toLowerCase();
+          console.log(`[SCRAPER] Found availability element: "${text}"`);
+          if (text.includes('dostępny') || text.includes('w magazynie')) {
+            availability = 'Dostępny';
+          } else if (text.includes('niedostępny') || text.includes('brak')) {
+            availability = 'Niedostępny';
+          } else if (text.includes('zamówienie')) {
+            availability = 'Na zamówienie';
+          }
+          if (availability) break;
+        }
+      }
+
+      // Fallback: check entire product container text
+      if (!availability) {
+        const containerText = productContainer.text().toLowerCase();
+        if (containerText.includes('dostępny') || containerText.includes('koszyka')) {
+          availability = 'Dostępny';
+        } else if (containerText.includes('niedostępny') || containerText.includes('brak')) {
+          availability = 'Niedostępny';
+        }
+      }
+    }
+
+    // Fallback: scan entire page for image if not found in container
+    if (!imageUrl) {
+      console.log('[SCRAPER] No image in container, scanning page...');
+      const pageImgSelectors = [
+        '.product-cover img',
+        '.product-image img',
+        '.thumbnail-container img',
+        '#product-images img',
+      ];
+      
+      for (const selector of pageImgSelectors) {
         const img = $(selector).first();
-        const src = img.attr('data-src') || img.attr('data-full-size-image-url') || img.attr('src');
-        if (src && !src.includes('logo') && !src.includes('icon') && !src.includes('banner')) {
-          imageUrl = src.startsWith('http') ? src : `https://jakobczak.pl${src.startsWith('/') ? '' : '/'}${src}`;
-          console.log(`Found image via selector ${selector}: ${imageUrl}`);
+        const src = img.attr('data-src') || img.attr('src');
+        if (src && !src.includes('logo') && !src.includes('icon')) {
+          imageUrl = src.startsWith('http') ? src : `https://jakobczak.pl${src}`;
+          console.log(`[SCRAPER] Found page image: ${imageUrl}`);
           break;
         }
       }
     }
 
-    // Strategy 3: Find any product image in HTML
-    if (!imageUrl) {
-      $('img').each((_, el) => {
-        if (imageUrl) return;
-        const src = $(el).attr('data-src') || $(el).attr('src');
-        if (src && src.includes('jakobczak') && !src.includes('logo') && !src.includes('icon')) {
-          imageUrl = src;
-          console.log(`Found fallback image: ${imageUrl}`);
-        }
-      });
-    }
-
-    // Find product URL
-    const productUrlSelectors = [
-      'a.product-thumbnail',
-      'a.thumbnail',
-      '.product-miniature a',
-      'article a[href*=".html"]',
-      'a[href*="/p/"]',
-      '.product-title a',
-    ];
-
-    for (const selector of productUrlSelectors) {
-      const link = $(selector).first().attr('href');
-      if (link && !link.includes('regulamin') && !link.includes('kontakt')) {
-        productUrl = link.startsWith('http') ? link : `https://jakobczak.pl${link.startsWith('/') ? '' : '/'}${link}`;
-        console.log(`Found product URL: ${productUrl}`);
-        break;
+    // Check page-wide availability if not found
+    if (!availability) {
+      const bodyText = $('body').text().toLowerCase();
+      if (bodyText.includes('dodaj do koszyka')) {
+        availability = 'Dostępny';
       }
     }
 
-    // Check availability in text content
-    const bodyText = $('body').text().toLowerCase();
-    if (bodyText.includes('dostępny') || bodyText.includes('w magazynie') || bodyText.includes('dodaj do koszyka')) {
-      availability = 'Dostępny';
-    } else if (bodyText.includes('niedostępny') || bodyText.includes('brak w magazynie')) {
-      availability = 'Niedostępny';
-    } else if (bodyText.includes('na zamówienie')) {
-      availability = 'Na zamówienie';
-    }
-
-    // If we found a product URL but no image, try fetching product page
-    if (productUrl && !imageUrl) {
-      try {
-        console.log(`Fetching product page: ${productUrl}`);
-        const productResponse = await fetch(productUrl, { headers: browserHeaders });
-        if (productResponse.ok) {
-          const productHtml = await productResponse.text();
-          const $product = cheerio.load(productHtml);
-          
-          // Try og:image first
-          const productOgImage = $product('meta[property="og:image"]').attr('content');
-          if (productOgImage) {
-            imageUrl = productOgImage;
-            console.log(`Found product page og:image: ${imageUrl}`);
-          }
-          
-          // Try product cover image
-          if (!imageUrl) {
-            const coverImg = $product('.product-cover img, .product-image img, #product-images img').first();
-            const src = coverImg.attr('data-src') || coverImg.attr('src');
-            if (src) {
-              imageUrl = src.startsWith('http') ? src : `https://jakobczak.pl${src}`;
-              console.log(`Found product cover image: ${imageUrl}`);
-            }
-          }
-
-          // Check availability on product page
-          const productText = $product('body').text().toLowerCase();
-          if (productText.includes('dostępny') || productText.includes('dodaj do koszyka')) {
-            availability = 'Dostępny';
-          } else if (productText.includes('niedostępny')) {
-            availability = 'Niedostępny';
-          }
-        }
-      } catch (e) {
-        console.log(`Error fetching product page: ${e}`);
-      }
-    }
-
-    const result = {
-      success: true,
-      imageUrl,
-      availability,
-      productUrl: productUrl || `https://jakobczak.pl/szukaj?q=${encodeURIComponent(searchTerm)}`,
-      searchTerm,
-    };
-
-    console.log(`Final result:`, JSON.stringify(result));
+    console.log(`[SCRAPER] Final result - Image: ${imageUrl}, Availability: ${availability}`);
 
     return new Response(
-      JSON.stringify(result),
+      JSON.stringify({ 
+        success: !!(imageUrl || availability),
+        imageUrl, 
+        availability 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Error in scrape-product-details:', errorMessage);
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[SCRAPER] Error: ${msg}`);
     return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: errorMessage,
-        imageUrl: null,
-        availability: null,
-        productUrl: null,
-      }),
+      JSON.stringify({ success: false, imageUrl: null, availability: null, error: msg }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
