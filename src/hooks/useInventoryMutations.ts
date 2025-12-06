@@ -19,7 +19,7 @@ export function useCreateInventory() {
   return useMutation({
     mutationFn: async (data: CreateInventoryData) => {
       const { data: result, error } = await externalSupabase
-        .from("inventory")
+        .from("Lokalizacje")
         .insert({
           sku: data.sku,
           location: data.location,
@@ -54,7 +54,7 @@ export function useUpdateInventory() {
   return useMutation({
     mutationFn: async (data: UpdateInventoryData) => {
       const { data: result, error } = await externalSupabase
-        .from("inventory")
+        .from("Lokalizacje")
         .update({
           sku: data.sku,
           location: data.location,
@@ -90,7 +90,7 @@ export function useDeleteInventory() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await externalSupabase.from("inventory").delete().eq("id", id);
+      const { error } = await externalSupabase.from("Lokalizacje").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
