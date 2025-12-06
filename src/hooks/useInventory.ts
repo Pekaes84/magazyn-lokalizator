@@ -22,7 +22,7 @@ export function useInventorySearch(searchTerm: string) {
       const { data, error } = await externalSupabase
         .from("Lokalizacje")
         .select("*")
-        .ilike("Symbol", `%${searchTerm}%`)
+        .or(`Symbol.ilike.%${searchTerm}%,Nazwa.ilike.%${searchTerm}%`)
         .order("Symbol")
         .limit(50);
 
