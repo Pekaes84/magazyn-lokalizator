@@ -23,7 +23,7 @@ export function InventoryRow({ item, isAdmin, onEdit, onDelete }: InventoryRowPr
 
   const { data: productDetails, isLoading: isLoadingDetails } = useQuery({
     queryKey: ["productDetails", item.Symbol],
-    queryFn: () => scrapeProductDetails(item.Symbol),
+    queryFn: () => scrapeProductDetails(item.Nazwa || item.Symbol, item.Symbol),
     enabled: isExpanded,
     staleTime: 1000 * 60 * 10, // 10 minutes
   });
