@@ -59,10 +59,17 @@ const Index = () => {
     setShowDeleteDialog(true);
   };
 
-  const handleSave = (data: { sku: string; location: string }) => {
+  const handleSave = (data: { symbol: string; nazwa: string; kontener: string; regal: string; polka: string }) => {
     if (editingItem) {
       updateMutation.mutate(
-        { id: editingItem.id, ...data },
+        { 
+          id: editingItem.id, 
+          Symbol: data.symbol,
+          Nazwa: data.nazwa,
+          Kontener: data.kontener,
+          Regał: data.regal,
+          Półka: data.polka,
+        },
         {
           onSuccess: () => {
             setShowFormDialog(false);
@@ -71,11 +78,20 @@ const Index = () => {
         }
       );
     } else {
-      createMutation.mutate(data, {
-        onSuccess: () => {
-          setShowFormDialog(false);
-        },
-      });
+      createMutation.mutate(
+        { 
+          Symbol: data.symbol,
+          Nazwa: data.nazwa,
+          Kontener: data.kontener,
+          Regał: data.regal,
+          Półka: data.polka,
+        }, 
+        {
+          onSuccess: () => {
+            setShowFormDialog(false);
+          },
+        }
+      );
     }
   };
 

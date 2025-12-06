@@ -3,14 +3,20 @@ import { externalSupabase } from "@/lib/externalSupabase";
 import { toast } from "@/hooks/use-toast";
 
 interface CreateInventoryData {
-  sku: string;
-  location: string;
+  Symbol: string;
+  Nazwa?: string;
+  Kontener?: string;
+  Regał?: string;
+  Półka?: string;
 }
 
 interface UpdateInventoryData {
   id: string;
-  sku: string;
-  location: string;
+  Symbol: string;
+  Nazwa?: string;
+  Kontener?: string;
+  Regał?: string;
+  Półka?: string;
 }
 
 export function useCreateInventory() {
@@ -21,8 +27,11 @@ export function useCreateInventory() {
       const { data: result, error } = await externalSupabase
         .from("Lokalizacje")
         .insert({
-          sku: data.sku,
-          location: data.location,
+          Symbol: data.Symbol,
+          Nazwa: data.Nazwa || null,
+          Kontener: data.Kontener || null,
+          Regał: data.Regał || null,
+          Półka: data.Półka || null,
         })
         .select()
         .single();
@@ -56,9 +65,11 @@ export function useUpdateInventory() {
       const { data: result, error } = await externalSupabase
         .from("Lokalizacje")
         .update({
-          sku: data.sku,
-          location: data.location,
-          last_updated: new Date().toISOString(),
+          Symbol: data.Symbol,
+          Nazwa: data.Nazwa || null,
+          Kontener: data.Kontener || null,
+          Regał: data.Regał || null,
+          Półka: data.Półka || null,
         })
         .eq("id", data.id)
         .select()

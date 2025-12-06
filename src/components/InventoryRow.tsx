@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, MapPin, Package, Loader2, ExternalLink, Pencil, Trash2 } from "lucide-react";
-import { scrapeProductDetails, ProductDetails } from "@/lib/scraper";
+import { scrapeProductDetails } from "@/lib/scraper";
 import { InventoryItem } from "@/hooks/useInventory";
 import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
-import { pl } from "date-fns/locale";
 
 interface InventoryRowProps {
   item: InventoryItem;
@@ -14,15 +12,23 @@ interface InventoryRowProps {
   onDelete?: (item: InventoryItem) => void;
 }
 
+// Helper to build location string from components
+function buildLocation(item: InventoryItem): string {
+  const parts = [item.Kontener, item.Regał, item.Półka].filter(Boolean);
+  return parts.length > 0 ? parts.join(" / ") : "Brak lokalizacji";
+}
+
 export function InventoryRow({ item, isAdmin, onEdit, onDelete }: InventoryRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const { data: productDetails, isLoading: isLoadingDetails } = useQuery({
-    queryKey: ["productDetails", item.sku],
-    queryFn: () => scrapeProductDetails(item.sku),
+    queryKey: ["productDetails", item.Symbol],
+    queryFn: () => scrapeProductDetails(item.Symbol),
     enabled: isExpanded,
     staleTime: 1000 * 60 * 10, // 10 minutes
   });
+
+  const location = buildLocation(item);
 
   return (
     <div className="border border-border rounded-lg overflow-hidden bg-card transition-all hover:shadow-md">
@@ -35,10 +41,16 @@ export function InventoryRow({ item, isAdmin, onEdit, onDelete }: InventoryRowPr
             <Package className="w-5 h-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-medium text-foreground truncate">{item.sku}</h3>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <h3 className="font-medium text-foreground truncate">
+              {item.Nazwa || item.Symbol}
+            </h3>
+            <p className="text-xs text-muted-foreground truncate">
+              Symbol: {item.Symbol}
+              {item["Kod kreskowy"] && ` | EAN: ${item["Kod kreskowy"]}`}
+            </p>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
               <MapPin className="w-4 h-4" />
-              <span className="font-mono font-semibold text-primary">{item.location}</span>
+              <span className="font-mono font-semibold text-primary">{location}</span>
             </div>
           </div>
         </div>
@@ -89,15 +101,33 @@ export function InventoryRow({ item, isAdmin, onEdit, onDelete }: InventoryRowPr
               </h4>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Lokalizacja:</span>
-                  <span className="font-mono font-bold text-primary">{item.location}</span>
+                  <span className="text-muted-foreground">Symbol:</span>
+                  <span className="font-mono text-foreground">{item.Symbol}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Ostatnia aktualizacja:</span>
-                  <span className="text-foreground">
-                    {format(new Date(item.last_updated), "d MMM yyyy, HH:mm", { locale: pl })}
-                  </span>
-                </div>
+                {item["Kod kreskowy"] && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Kod kreskowy:</span>
+                    <span className="font-mono text-foreground">{item["Kod kreskowy"]}</span>
+                  </div>
+                )}
+                {item.Kontener && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Kontener:</span>
+                    <span className="font-mono font-bold text-primary">{item.Kontener}</span>
+                  </div>
+                )}
+                {item.Regał && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Regał:</span>
+                    <span className="font-mono font-bold text-primary">{item.Regał}</span>
+                  </div>
+                )}
+                {item.Półka && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Półka:</span>
+                    <span className="font-mono font-bold text-primary">{item.Półka}</span>
+                  </div>
+                )}
                 {isLoadingDetails ? (
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -144,7 +174,7 @@ export function InventoryRow({ item, isAdmin, onEdit, onDelete }: InventoryRowPr
               ) : productDetails?.imageUrl ? (
                 <img
                   src={productDetails.imageUrl}
-                  alt={item.sku}
+                  alt={item.Nazwa || item.Symbol}
                   className="w-full max-w-[200px] h-auto rounded-lg border border-border shadow-sm"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = "none";
