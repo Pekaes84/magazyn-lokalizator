@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, Shield, ShieldCheck, ShieldX, Users, UserPlus } from 'lucide-react';
+import { Loader2, ArrowLeft, Shield, ShieldCheck, ShieldX, Users, UserPlus, Trash2 } from 'lucide-react';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import logo from '@/assets/logo.png';
 
 const newUserSchema = z.object({
@@ -34,6 +35,8 @@ export default function Admin() {
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [deletingUser, setDeletingUser] = useState<UserWithRole | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   useEffect(() => {
     if (!loading) {
       if (!user) {
@@ -181,6 +184,45 @@ export default function Admin() {
     }
   };
 
+  const handleDeleteUser = async () => {
+    if (!deletingUser) return;
+
+    setIsDeleting(true);
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { userId: deletingUser.id },
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined
+      });
+
+      if (error) throw error;
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
+      toast({
+        title: 'Użytkownik usunięty',
+        description: `Konto ${deletingUser.username || 'użytkownika'} zostało usunięte`,
+      });
+
+      setUsers((prev) => prev.filter((u) => u.id !== deletingUser.id));
+      setDeletingUser(null);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Błąd usuwania użytkownika';
+      toast({
+        title: 'Błąd',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (loading || !isAdmin) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -312,26 +354,36 @@ export default function Admin() {
                         {u.role === 'admin' ? 'Administrator' : 'Użytkownik'}
                       </Badge>
                       {u.id !== user?.id && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => toggleUserRole(u.id, u.role)}
-                          disabled={updatingUserId === u.id}
-                        >
-                          {updatingUserId === u.id ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : u.role === 'admin' ? (
-                            <>
-                              <ShieldX className="w-4 h-4 mr-1" />
-                              Odbierz admin
-                            </>
-                          ) : (
-                            <>
-                              <ShieldCheck className="w-4 h-4 mr-1" />
-                              Nadaj admin
-                            </>
-                          )}
-                        </Button>
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleUserRole(u.id, u.role)}
+                            disabled={updatingUserId === u.id}
+                          >
+                            {updatingUserId === u.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : u.role === 'admin' ? (
+                              <>
+                                <ShieldX className="w-4 h-4 mr-1" />
+                                Odbierz admin
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck className="w-4 h-4 mr-1" />
+                                Nadaj admin
+                              </>
+                            )}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => setDeletingUser(u)}
+                          >
+                            <Trash2 className="w-4 h-4 mr-1" />
+                            Usuń
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -340,6 +392,15 @@ export default function Admin() {
             )}
           </CardContent>
         </Card>
+
+        <DeleteConfirmDialog
+          open={!!deletingUser}
+          onOpenChange={(open) => !open && setDeletingUser(null)}
+          onConfirm={handleDeleteUser}
+          isLoading={isDeleting}
+          title="Usunąć użytkownika?"
+          description={`Czy na pewno chcesz usunąć użytkownika "${deletingUser?.username || 'Bez nazwy'}"? Ta operacja jest nieodwracalna.`}
+        />
       </main>
     </div>
   );
