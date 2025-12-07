@@ -13,7 +13,7 @@ import {
 } from "@/hooks/useInventoryMutations";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, Pencil, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
@@ -172,19 +172,6 @@ const Index = () => {
             >
               <Pencil className="w-4 h-4 mr-2" />
               Zmień lokalizację
-            </Button>
-            <Button
-              onClick={() => {
-                toast({
-                  title: "Usuwanie towaru",
-                  description: "Wyszukaj produkt i rozwiń go, aby usunąć",
-                });
-              }}
-              variant="outline"
-              className="text-destructive hover:text-destructive"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Usuń towar
             </Button>
           </div>
 

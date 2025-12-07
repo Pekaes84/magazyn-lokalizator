@@ -161,18 +161,6 @@ export function InventoryRow({
                 <Pencil className="w-4 h-4 mr-2" />
                 Zmień lokalizację
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-destructive hover:text-destructive"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete?.(item);
-                }}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Usuń towar
-              </Button>
             </div>}
         </div>}
     </div>;
