@@ -38,10 +38,36 @@ export function InventoryRow({
   const location = buildLocation(item);
   const getAvailabilityBadge = () => {
     if (!productDetails?.availability) return null;
-    const variant = productDetails.availability === "Dostępny" ? "default" : productDetails.availability === "Niedostępny" ? "destructive" : "secondary";
-    return <Badge variant={variant} className={productDetails.availability === "Dostępny" ? "bg-green-600 hover:bg-green-700" : ""}>
-        {productDetails.availability}
-      </Badge>;
+    
+    const availability = productDetails.availability;
+    
+    // Determine badge style based on availability
+    let badgeClass = "";
+    let variant: "default" | "destructive" | "secondary" | "outline" = "secondary";
+    
+    if (availability === "Niedostępny") {
+      variant = "destructive";
+    } else if (availability === "duża ilość") {
+      variant = "default";
+      badgeClass = "bg-green-600 hover:bg-green-700";
+    } else if (availability === "średnia ilość") {
+      variant = "default";
+      badgeClass = "bg-yellow-500 hover:bg-yellow-600 text-black";
+    } else if (availability === "mała ilość") {
+      variant = "default";
+      badgeClass = "bg-orange-500 hover:bg-orange-600";
+    } else if (availability === "Dostępny") {
+      variant = "default";
+      badgeClass = "bg-green-600 hover:bg-green-700";
+    } else if (availability === "Na zamówienie") {
+      variant = "secondary";
+    }
+    
+    return (
+      <Badge variant={variant} className={badgeClass}>
+        {availability}
+      </Badge>
+    );
   };
   const handleRowClick = () => {
     if (selectionMode && onItemClick) {

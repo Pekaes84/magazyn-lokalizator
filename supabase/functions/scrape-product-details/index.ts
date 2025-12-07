@@ -148,15 +148,21 @@ serve(async (req) => {
         // Priority 1: Check for explicit availability text like "Dostępność: duża ilość"
         const availMatch = html.match(/<span[^>]+class="first"[^>]*>\s*Dostępność:\s*<\/span>\s*<span[^>]+class="second"[^>]*>\s*([^<]+)/i);
         if (availMatch && availMatch[1]) {
-          const availText = availMatch[1].trim().toLowerCase();
+          const availText = availMatch[1].trim();
+          const availTextLower = availText.toLowerCase();
           console.log(`[SCRAPER] Found availability text: "${availText}"`);
           
-          if (availText.includes('brak') || availText.includes('niedostępn') || availText === '0') {
+          if (availTextLower.includes('brak') || availTextLower.includes('niedostępn') || availText === '0') {
             availability = 'Niedostępny';
-          } else if (availText.includes('zamówien')) {
+          } else if (availTextLower.includes('zamówien')) {
             availability = 'Na zamówienie';
-          } else if (availText.includes('duża') || availText.includes('mała') || availText.includes('średnia') || 
-                     availText.includes('szt') || availText.includes('dostępn') || /\d+/.test(availText)) {
+          } else if (availTextLower.includes('duża ilość')) {
+            availability = 'duża ilość';
+          } else if (availTextLower.includes('średnia ilość')) {
+            availability = 'średnia ilość';
+          } else if (availTextLower.includes('mała ilość')) {
+            availability = 'mała ilość';
+          } else if (availTextLower.includes('szt') || availTextLower.includes('dostępn') || /\d+/.test(availText)) {
             availability = 'Dostępny';
           }
         }
