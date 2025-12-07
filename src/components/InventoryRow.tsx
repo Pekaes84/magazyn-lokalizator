@@ -75,28 +75,6 @@ export function InventoryRow({ item, isAdmin, onEdit, onDelete }: InventoryRowPr
         </div>
 
         <div className="flex items-center gap-2">
-          {isAdmin && (
-            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onEdit?.(item)}
-                className="text-xs"
-              >
-                <Pencil className="w-3 h-3 mr-1" />
-                Zmień lokalizację
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onDelete?.(item)}
-                className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="w-3 h-3 mr-1" />
-                Usuń
-              </Button>
-            </div>
-          )}
           <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
             {isExpanded ? (
               <ChevronUp className="w-5 h-5 text-muted-foreground" />
