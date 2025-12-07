@@ -34,13 +34,37 @@ export function InventoryFormDialog({
   const [regal, setRegal] = useState("");
   const [polka, setPolka] = useState("");
 
+  // Helper function to strip prefix for display
+  const stripPrefix = (value: string | null | undefined, prefix: string): string => {
+    if (!value) return "";
+    const upper = value.toUpperCase();
+    if (upper.startsWith(prefix)) {
+      return value.slice(prefix.length);
+    }
+    return value;
+  };
+
+  // Helper function to add prefix when saving
+  const addPrefix = (value: string, prefix: string): string => {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    const upper = trimmed.toUpperCase();
+    // If already has the prefix, return as-is (uppercase)
+    if (upper.startsWith(prefix)) {
+      return upper;
+    }
+    // Add prefix
+    return prefix + trimmed.toUpperCase();
+  };
+
   useEffect(() => {
     if (item) {
       setSymbol(item.Symbol);
       setNazwa(item.Nazwa || "");
-      setKontener(item.Kontener || "");
-      setRegal(item.Regał || "");
-      setPolka(item.Półka || "");
+      // Strip prefixes for display so user sees just the number
+      setKontener(stripPrefix(item.Kontener, "K"));
+      setRegal(stripPrefix(item.Regał, "R"));
+      setPolka(stripPrefix(item.Półka, "P"));
     } else {
       setSymbol("");
       setNazwa("");
@@ -56,9 +80,10 @@ export function InventoryFormDialog({
       onSave({ 
         symbol: symbol.trim(), 
         nazwa: nazwa.trim(),
-        kontener: kontener.trim(), 
-        regal: regal.trim(), 
-        polka: polka.trim() 
+        // Add prefixes when saving
+        kontener: addPrefix(kontener, "K"), 
+        regal: addPrefix(regal, "R"), 
+        polka: addPrefix(polka, "P") 
       });
     }
   };
@@ -103,31 +128,43 @@ export function InventoryFormDialog({
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="kontener">Kontener</Label>
-                <Input
-                  id="kontener"
-                  placeholder="np. K01"
-                  value={kontener}
-                  onChange={(e) => setKontener(e.target.value)}
-                />
+                <Label htmlFor="kontener">Kontener (K)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">K</span>
+                  <Input
+                    id="kontener"
+                    placeholder="np. 01"
+                    value={kontener}
+                    onChange={(e) => setKontener(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="regal">Regał</Label>
-                <Input
-                  id="regal"
-                  placeholder="np. R01"
-                  value={regal}
-                  onChange={(e) => setRegal(e.target.value)}
-                />
+                <Label htmlFor="regal">Regał (R)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">R</span>
+                  <Input
+                    id="regal"
+                    placeholder="np. 01"
+                    value={regal}
+                    onChange={(e) => setRegal(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="polka">Półka</Label>
-                <Input
-                  id="polka"
-                  placeholder="np. P01"
-                  value={polka}
-                  onChange={(e) => setPolka(e.target.value)}
-                />
+                <Label htmlFor="polka">Półka (P)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">P</span>
+                  <Input
+                    id="polka"
+                    placeholder="np. 01"
+                    value={polka}
+                    onChange={(e) => setPolka(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
               </div>
             </div>
           </div>
