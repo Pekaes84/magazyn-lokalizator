@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,16 +12,17 @@ import { Loader2, LogIn } from 'lucide-react';
 import logo from '@/assets/logo.png';
 
 const authSchema = z.object({
-  email: z.string().trim().email({ message: 'Nieprawidłowy adres email' }),
+  username: z.string().trim().min(1, { message: 'Nazwa użytkownika jest wymagana' }),
   password: z.string().min(6, { message: 'Hasło musi mieć minimum 6 znaków' }),
 });
 
 export default function Auth() {
   const navigate = useNavigate();
   const { user, loading, signIn } = useAuth();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   useEffect(() => {
     if (!loading && user) {
       navigate('/', { replace: true });
@@ -28,7 +30,7 @@ export default function Auth() {
   }, [user, loading, navigate]);
 
   const validateForm = () => {
-    const result = authSchema.safeParse({ email, password });
+    const result = authSchema.safeParse({ username, password });
     if (!result.success) {
       const errors = result.error.errors;
       toast({
@@ -46,19 +48,28 @@ export default function Auth() {
     if (!validateForm()) return;
 
     setIsSubmitting(true);
-    const { error } = await signIn(email, password);
+
+    // Get email by username
+    const { data: emailData, error: lookupError } = await supabase
+      .rpc('get_email_by_username', { _username: username });
+
+    if (lookupError || !emailData) {
+      setIsSubmitting(false);
+      toast({
+        title: 'Błąd logowania',
+        description: 'Nieprawidłowa nazwa użytkownika lub hasło',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const { error } = await signIn(emailData, password);
     setIsSubmitting(false);
 
     if (error) {
-      let message = 'Błąd logowania';
-      if (error.message.includes('Invalid login credentials')) {
-        message = 'Nieprawidłowy email lub hasło';
-      } else if (error.message.includes('Email not confirmed')) {
-        message = 'Email nie został potwierdzony';
-      }
       toast({
         title: 'Błąd logowania',
-        description: message,
+        description: 'Nieprawidłowa nazwa użytkownika lub hasło',
         variant: 'destructive',
       });
     } else {
@@ -97,13 +108,13 @@ export default function Auth() {
         <CardContent>
           <form onSubmit={handleSignIn} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="login-email">Email</Label>
+              <Label htmlFor="login-username">Nazwa użytkownika</Label>
               <Input
-                id="login-email"
-                type="email"
-                placeholder="twoj@email.pl"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="login-username"
+                type="text"
+                placeholder="Twoja nazwa"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
                 disabled={isSubmitting}
               />

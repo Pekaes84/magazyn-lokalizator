@@ -13,12 +13,14 @@ import { Loader2, ArrowLeft, Shield, ShieldCheck, ShieldX, Users, UserPlus } fro
 import logo from '@/assets/logo.png';
 
 const newUserSchema = z.object({
+  username: z.string().trim().min(1, { message: 'Nazwa użytkownika jest wymagana' }),
   email: z.string().trim().email({ message: 'Nieprawidłowy adres email' }),
   password: z.string().min(6, { message: 'Hasło musi mieć minimum 6 znaków' }),
 });
 
 interface UserWithRole {
   id: string;
+  username: string | null;
   email: string;
   role: 'admin' | 'user';
   created_at: string;
@@ -30,6 +32,7 @@ export default function Admin() {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [newUsername, setNewUsername] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -59,7 +62,7 @@ export default function Admin() {
       // Fetch profiles with roles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, created_at');
+        .select('id, email, username, created_at');
 
       if (profilesError) throw profilesError;
 
@@ -73,6 +76,7 @@ export default function Admin() {
         const userRole = roles?.find((r) => r.user_id === profile.id);
         return {
           id: profile.id,
+          username: profile.username,
           email: profile.email || 'Brak emaila',
           role: (userRole?.role as 'admin' | 'user') || 'user',
           created_at: profile.created_at,
@@ -136,7 +140,7 @@ export default function Admin() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const result = newUserSchema.safeParse({ email: newEmail, password: newPassword });
+    const result = newUserSchema.safeParse({ username: newUsername, email: newEmail, password: newPassword });
     if (!result.success) {
       toast({
         title: 'Błąd walidacji',
@@ -147,10 +151,10 @@ export default function Admin() {
     }
 
     setIsCreating(true);
-    const { error } = await signUp(newEmail, newPassword);
-    setIsCreating(false);
+    const { error, data } = await signUp(newEmail, newPassword);
 
     if (error) {
+      setIsCreating(false);
       let message = 'Błąd tworzenia użytkownika';
       if (error.message.includes('User already registered')) {
         message = 'Użytkownik z tym adresem email już istnieje';
@@ -160,16 +164,31 @@ export default function Admin() {
         description: message,
         variant: 'destructive',
       });
-    } else {
-      toast({
-        title: 'Użytkownik utworzony',
-        description: `Konto dla ${newEmail} zostało utworzone`,
-      });
-      setNewEmail('');
-      setNewPassword('');
-      // Refresh users list after a short delay
-      setTimeout(() => fetchUsers(), 1000);
+      return;
     }
+
+    // Update profile with username
+    if (data?.user) {
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ username: newUsername })
+        .eq('id', data.user.id);
+
+      if (updateError) {
+        console.error('Error setting username:', updateError);
+      }
+    }
+
+    setIsCreating(false);
+    toast({
+      title: 'Użytkownik utworzony',
+      description: `Konto dla ${newUsername} zostało utworzone`,
+    });
+    setNewUsername('');
+    setNewEmail('');
+    setNewPassword('');
+    // Refresh users list after a short delay
+    setTimeout(() => fetchUsers(), 1000);
   };
 
   if (loading || !isAdmin) {
@@ -219,6 +238,18 @@ export default function Admin() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleCreateUser} className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="new-username">Nazwa użytkownika</Label>
+                <Input
+                  id="new-username"
+                  type="text"
+                  placeholder="np. Jan"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  required
+                  disabled={isCreating}
+                />
+              </div>
               <div className="flex-1 space-y-2">
                 <Label htmlFor="new-email">Email</Label>
                 <Input
@@ -292,9 +323,9 @@ export default function Admin() {
                         <Shield className="w-5 h-5 text-muted-foreground" />
                       )}
                       <div>
-                        <p className="font-medium">{u.email}</p>
+                        <p className="font-medium">{u.username || u.email}</p>
                         <p className="text-sm text-muted-foreground">
-                          Dołączył: {new Date(u.created_at).toLocaleDateString('pl-PL')}
+                          {u.email} • Dołączył: {new Date(u.created_at).toLocaleDateString('pl-PL')}
                         </p>
                       </div>
                     </div>
