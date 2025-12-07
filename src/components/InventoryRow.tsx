@@ -175,6 +175,36 @@ export function InventoryRow({ item, isAdmin, onEdit, onDelete }: InventoryRowPr
               </div>
             </div>
           </div>
+
+          {/* Action Buttons */}
+          {isAdmin && (
+            <div className="flex gap-2 mt-4 pt-4 border-t border-border">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit?.(item);
+                }}
+                className="text-xs"
+              >
+                <Pencil className="w-3 h-3 mr-1" />
+                Zmień lokalizację
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.(item);
+                }}
+                className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="w-3 h-3 mr-1" />
+                Usuń
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

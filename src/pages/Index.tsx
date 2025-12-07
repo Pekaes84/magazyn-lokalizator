@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { SearchBar } from "@/components/SearchBar";
 import { InventoryList } from "@/components/InventoryList";
-import { PinDialog } from "@/components/PinDialog";
 import { InventoryFormDialog } from "@/components/InventoryFormDialog";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useInventorySearch, InventoryItem } from "@/hooks/useInventory";
@@ -11,14 +11,16 @@ import {
   useUpdateInventory,
   useDeleteInventory,
 } from "@/hooks/useInventoryMutations";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Plus, LogOut, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { user, isAdmin, loading, signOut } = useAuth();
+  
   const [searchTerm, setSearchTerm] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [showPinDialog, setShowPinDialog] = useState(false);
   const [showFormDialog, setShowFormDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
@@ -29,24 +31,27 @@ const Index = () => {
   const updateMutation = useUpdateInventory();
   const deleteMutation = useDeleteInventory();
 
-  const handleAdminClick = () => {
-    if (isAdmin) {
-      setIsAdmin(false);
+  // Redirect to auth if not logged in
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/auth', { replace: true });
+    }
+  }, [user, loading, navigate]);
+
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
       toast({
-        title: "Wylogowano",
-        description: "Opuszczono tryb administratora",
+        title: "Błąd",
+        description: "Nie udało się wylogować",
+        variant: "destructive",
       });
     } else {
-      setShowPinDialog(true);
+      toast({
+        title: "Wylogowano",
+        description: "Do zobaczenia!",
+      });
     }
-  };
-
-  const handleAdminSuccess = () => {
-    setIsAdmin(true);
-    toast({
-      title: "Zalogowano",
-      description: "Tryb administratora aktywny",
-    });
   };
 
   const handleEdit = (item: InventoryItem) => {
@@ -106,9 +111,26 @@ const Index = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      <Header isAdmin={isAdmin} onAdminClick={handleAdminClick} />
+      <Header 
+        isAdmin={isAdmin} 
+        onAdminClick={() => navigate('/admin')} 
+        onSignOut={handleSignOut}
+        userEmail={user.email}
+      />
 
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
@@ -127,73 +149,51 @@ const Index = () => {
             <SearchBar value={searchTerm} onChange={setSearchTerm} />
           </div>
 
-          {/* Admin Controls */}
-          {isAdmin && (
-            <div className="flex items-center justify-between mb-6 p-4 bg-primary/5 border border-primary/20 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-sm font-medium text-primary">
-                  Tryb Administratora aktywny
-                </span>
-              </div>
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  onClick={() => {
-                    setEditingItem(null);
-                    setShowFormDialog(true);
-                  }}
-                  size="sm"
-                  className="shadow-burgundy"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Dodaj towar
-                </Button>
-                <Button
-                  onClick={() => {
-                    toast({
-                      title: "Zmiana lokalizacji",
-                      description: "Wyszukaj produkt i kliknij przycisk 'Zmień lokalizację' przy wybranym produkcie",
-                    });
-                  }}
-                  variant="outline"
-                  size="sm"
-                >
-                  <Pencil className="w-4 h-4 mr-2" />
-                  Zmień lokalizację
-                </Button>
-                <Button
-                  onClick={() => {
-                    toast({
-                      title: "Usuwanie towaru",
-                      description: "Wyszukaj produkt i kliknij przycisk 'Usuń' przy wybranym produkcie",
-                    });
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Usuń towar
-                </Button>
-                <Button
-                  onClick={handleAdminClick}
-                  variant="outline"
-                  size="sm"
-                  className="text-muted-foreground"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Wyloguj
-                </Button>
-              </div>
-            </div>
-          )}
+          {/* Action Buttons - visible for all logged in users */}
+          <div className="flex items-center justify-center gap-3 mb-6 flex-wrap">
+            <Button
+              onClick={() => {
+                setEditingItem(null);
+                setShowFormDialog(true);
+              }}
+              className="shadow-burgundy"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Dodaj towar
+            </Button>
+            <Button
+              onClick={() => {
+                toast({
+                  title: "Zmiana lokalizacji",
+                  description: "Wyszukaj produkt i rozwiń go, aby zmienić lokalizację",
+                });
+              }}
+              variant="outline"
+            >
+              <Pencil className="w-4 h-4 mr-2" />
+              Zmień lokalizację
+            </Button>
+            <Button
+              onClick={() => {
+                toast({
+                  title: "Usuwanie towaru",
+                  description: "Wyszukaj produkt i rozwiń go, aby usunąć",
+                });
+              }}
+              variant="outline"
+              className="text-destructive hover:text-destructive"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Usuń towar
+            </Button>
+          </div>
 
           {/* Results */}
           <InventoryList
             items={items}
             isLoading={isLoading}
             searchTerm={searchTerm}
-            isAdmin={isAdmin}
+            isAdmin={true}
             onEdit={handleEdit}
             onDelete={handleDelete}
           />
@@ -208,12 +208,6 @@ const Index = () => {
       </footer>
 
       {/* Dialogs */}
-      <PinDialog
-        open={showPinDialog}
-        onOpenChange={setShowPinDialog}
-        onSuccess={handleAdminSuccess}
-      />
-
       <InventoryFormDialog
         open={showFormDialog}
         onOpenChange={(open) => {
