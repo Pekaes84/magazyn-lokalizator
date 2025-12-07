@@ -14,7 +14,6 @@ import logo from '@/assets/logo.png';
 
 const newUserSchema = z.object({
   username: z.string().trim().min(1, { message: 'Nazwa użytkownika jest wymagana' }),
-  email: z.string().trim().email({ message: 'Nieprawidłowy adres email' }),
   password: z.string().min(6, { message: 'Hasło musi mieć minimum 6 znaków' }),
 });
 
@@ -33,7 +32,6 @@ export default function Admin() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const [newUsername, setNewUsername] = useState('');
-  const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   useEffect(() => {
@@ -140,7 +138,7 @@ export default function Admin() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const result = newUserSchema.safeParse({ username: newUsername, email: newEmail, password: newPassword });
+    const result = newUserSchema.safeParse({ username: newUsername, password: newPassword });
     if (!result.success) {
       toast({
         title: 'Błąd walidacji',
@@ -150,14 +148,17 @@ export default function Admin() {
       return;
     }
 
+    // Generate internal email from username
+    const generatedEmail = `${newUsername.toLowerCase().replace(/\s+/g, '_')}@internal.local`;
+
     setIsCreating(true);
-    const { error, data } = await signUp(newEmail, newPassword);
+    const { error, data } = await signUp(generatedEmail, newPassword);
 
     if (error) {
       setIsCreating(false);
       let message = 'Błąd tworzenia użytkownika';
       if (error.message.includes('User already registered')) {
-        message = 'Użytkownik z tym adresem email już istnieje';
+        message = 'Użytkownik o tej nazwie już istnieje';
       }
       toast({
         title: 'Błąd',
@@ -185,7 +186,6 @@ export default function Admin() {
       description: `Konto dla ${newUsername} zostało utworzone`,
     });
     setNewUsername('');
-    setNewEmail('');
     setNewPassword('');
     // Refresh users list after a short delay
     setTimeout(() => fetchUsers(), 1000);
@@ -251,18 +251,6 @@ export default function Admin() {
                 />
               </div>
               <div className="flex-1 space-y-2">
-                <Label htmlFor="new-email">Email</Label>
-                <Input
-                  id="new-email"
-                  type="email"
-                  placeholder="email@firma.pl"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  required
-                  disabled={isCreating}
-                />
-              </div>
-              <div className="flex-1 space-y-2">
                 <Label htmlFor="new-password">Hasło</Label>
                 <Input
                   id="new-password"
@@ -323,9 +311,9 @@ export default function Admin() {
                         <Shield className="w-5 h-5 text-muted-foreground" />
                       )}
                       <div>
-                        <p className="font-medium">{u.username || u.email}</p>
+                        <p className="font-medium">{u.username || 'Bez nazwy'}</p>
                         <p className="text-sm text-muted-foreground">
-                          {u.email} • Dołączył: {new Date(u.created_at).toLocaleDateString('pl-PL')}
+                          Dołączył: {new Date(u.created_at).toLocaleDateString('pl-PL')}
                         </p>
                       </div>
                     </div>
