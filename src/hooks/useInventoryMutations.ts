@@ -62,7 +62,7 @@ export function useUpdateInventory() {
 
   return useMutation({
     mutationFn: async (data: UpdateInventoryData) => {
-      const { data: result, error } = await externalSupabase
+      const { error, count } = await externalSupabase
         .from("Lokalizacje")
         .update({
           Symbol: data.Symbol,
@@ -71,12 +71,10 @@ export function useUpdateInventory() {
           Regał: data.Regał || null,
           Półka: data.Półka || null,
         })
-        .eq("Symbol", data.originalSymbol)
-        .select()
-        .single();
+        .eq("Symbol", data.originalSymbol);
 
       if (error) throw error;
-      return result;
+      return { success: true };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
