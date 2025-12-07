@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import * as cheerio from "https://esm.sh/cheerio@1.0.0-rc.12";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,91 +22,152 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[SCRAPER] Searching for: "${searchTerm}"`);
-
-    const searchUrl = `https://jakobczak.pl/szukaj?controller=search&s=${encodeURIComponent(searchTerm)}`;
-    console.log(`[SCRAPER] Fetching: ${searchUrl}`);
-
-    const response = await fetch(searchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'pl-PL,pl;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-      },
-    });
-
-    console.log(`[SCRAPER] Response status: ${response.status}`);
-
-    if (!response.ok) {
-      console.error(`[SCRAPER] HTTP error: ${response.status}`);
+    const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+    if (!FIRECRAWL_API_KEY) {
+      console.error('[SCRAPER] FIRECRAWL_API_KEY not configured');
       return new Response(
-        JSON.stringify({ success: false, imageUrl: null, availability: null }),
+        JSON.stringify({ success: false, imageUrl: null, availability: null, error: 'API key not configured' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const html = await response.text();
-    console.log(`[SCRAPER] Received ${html.length} bytes of HTML`);
+    console.log(`[SCRAPER] Searching for: "${searchTerm}" using Firecrawl`);
 
-    const $ = cheerio.load(html);
-    
+    // Use Firecrawl search to find the product on jakobczak.pl
+    const searchResponse = await fetch('https://api.firecrawl.dev/v1/search', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: `site:jakobczak.pl ${searchTerm}`,
+        limit: 3,
+        scrapeOptions: {
+          formats: ['markdown', 'html'],
+        }
+      }),
+    });
+
+    if (!searchResponse.ok) {
+      const errorText = await searchResponse.text();
+      console.error(`[SCRAPER] Firecrawl search error: ${searchResponse.status} - ${errorText}`);
+      return new Response(
+        JSON.stringify({ success: false, imageUrl: null, availability: null, error: 'Search failed' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const searchData = await searchResponse.json();
+    console.log(`[SCRAPER] Firecrawl search returned ${searchData.data?.length || 0} results`);
+
     let imageUrl: string | null = null;
     let availability: string | null = null;
+    let productUrl: string | null = null;
 
-    // Find first product - jakobczak.pl uses .product.row or div[data-product-id]
-    const productContainer = $('div.product.row, div[data-product-id]').first();
-    
-    if (productContainer.length > 0) {
-      console.log('[SCRAPER] Found product container');
-      
-      // Extract image - images use data-src for lazy loading
-      const img = productContainer.find('img').first();
-      const imgSrc = img.attr('data-src') || img.attr('src');
-      
-      if (imgSrc && !imgSrc.includes('1px.gif') && !imgSrc.includes('base64')) {
-        // Convert relative path to absolute
-        imageUrl = imgSrc.startsWith('http') ? imgSrc : `https://jakobczak.pl${imgSrc}`;
-        console.log(`[SCRAPER] Found image: ${imageUrl}`);
+    // Find the best matching product URL
+    if (searchData.data && searchData.data.length > 0) {
+      for (const result of searchData.data) {
+        const url = result.url || '';
+        // Look for product pages (contain /p/ in URL)
+        if (url.includes('/pl/p/') || url.includes('jakobczak.pl/p/')) {
+          productUrl = url;
+          console.log(`[SCRAPER] Found product URL: ${productUrl}`);
+          break;
+        }
       }
 
-      // Check if product has "Do koszyka" button = available
-      const addToCartBtn = productContainer.find('button.addtobasket, .addtobasket');
-      if (addToCartBtn.length > 0) {
-        availability = 'Dostępny';
-        console.log('[SCRAPER] Found add to cart button - product available');
-      }
-    } else {
-      console.log('[SCRAPER] No product container found, trying alternative selectors');
-      
-      // Try alternative selectors
-      const altImg = $('img[data-src*="/environment/cache/images/"]').first();
-      const altSrc = altImg.attr('data-src');
-      if (altSrc) {
-        imageUrl = altSrc.startsWith('http') ? altSrc : `https://jakobczak.pl${altSrc}`;
-        console.log(`[SCRAPER] Found alt image: ${imageUrl}`);
+      // If no product page found, use first result
+      if (!productUrl && searchData.data[0]?.url) {
+        productUrl = searchData.data[0].url;
+        console.log(`[SCRAPER] Using first result URL: ${productUrl}`);
       }
     }
 
-    // Check page text for availability if not found
-    if (!availability) {
-      const bodyText = $('body').text().toLowerCase();
-      if (bodyText.includes('do koszyka') || bodyText.includes('dodaj do koszyka')) {
-        availability = 'Dostępny';
-      } else if (bodyText.includes('niedostępny') || bodyText.includes('brak w magazynie')) {
-        availability = 'Niedostępny';
-      } else if (bodyText.includes('na zamówienie')) {
-        availability = 'Na zamówienie';
-      }
-    }
+    // If we found a product URL, scrape it directly for better data
+    if (productUrl) {
+      console.log(`[SCRAPER] Scraping product page: ${productUrl}`);
+      
+      const scrapeResponse = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: productUrl,
+          formats: ['html'],
+          waitFor: 2000, // Wait for JS to load
+        }),
+      });
 
-    // Check if no products found
-    if (!imageUrl && !availability) {
-      const noResultsText = $('body').text();
-      if (noResultsText.includes('Brak produktów') || noResultsText.includes('Nie znaleziono')) {
-        console.log('[SCRAPER] No products found for this search');
+      if (scrapeResponse.ok) {
+        const scrapeData = await scrapeResponse.json();
+        const html = scrapeData.data?.html || '';
+        
+        console.log(`[SCRAPER] Scraped ${html.length} bytes of HTML`);
+
+        // Extract main product image from HTML
+        // Look for og:image meta tag first (most reliable)
+        const ogImageMatch = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i) ||
+                            html.match(/<meta\s+content="([^"]+)"\s+property="og:image"/i);
+        if (ogImageMatch) {
+          imageUrl = ogImageMatch[1];
+          console.log(`[SCRAPER] Found og:image: ${imageUrl}`);
+        }
+
+        // If no og:image, look for product image in HTML
+        if (!imageUrl) {
+          // Look for main product image container
+          const productImgMatch = html.match(/<img[^>]+class="[^"]*mainimg[^"]*"[^>]+src="([^"]+)"/i) ||
+                                  html.match(/<img[^>]+id="[^"]*mainimg[^"]*"[^>]+src="([^"]+)"/i) ||
+                                  html.match(/<div[^>]+class="[^"]*product-image[^"]*"[^>]*>[\s\S]*?<img[^>]+src="([^"]+)"/i) ||
+                                  html.match(/<a[^>]+class="[^"]*mainimg[^"]*"[^>]+href="([^"]+)"/i);
+          
+          if (productImgMatch) {
+            imageUrl = productImgMatch[1];
+            // Handle data-src lazy loading
+            const dataSrcMatch = html.match(/<img[^>]+class="[^"]*mainimg[^"]*"[^>]+data-src="([^"]+)"/i);
+            if (dataSrcMatch && !dataSrcMatch[1].includes('1px')) {
+              imageUrl = dataSrcMatch[1];
+            }
+            console.log(`[SCRAPER] Found product image: ${imageUrl}`);
+          }
+        }
+
+        // If still no image, try finding any large product image
+        if (!imageUrl) {
+          const imgMatches = html.matchAll(/<img[^>]+src="(https:\/\/jakobczak\.pl\/[^"]+\/products\/[^"]+)"/gi);
+          for (const match of imgMatches) {
+            if (!match[1].includes('1px') && !match[1].includes('thumbnail')) {
+              imageUrl = match[1];
+              console.log(`[SCRAPER] Found product image from products folder: ${imageUrl}`);
+              break;
+            }
+          }
+        }
+
+        // Check availability
+        if (html.includes('Do koszyka') || html.includes('do koszyka') || html.includes('addtobasket')) {
+          availability = 'Dostępny';
+          console.log('[SCRAPER] Product is available (add to cart button found)');
+        } else if (html.includes('niedostępny') || html.includes('Niedostępny') || html.includes('brak w magazynie')) {
+          availability = 'Niedostępny';
+          console.log('[SCRAPER] Product is unavailable');
+        } else if (html.includes('na zamówienie') || html.includes('Na zamówienie')) {
+          availability = 'Na zamówienie';
+          console.log('[SCRAPER] Product is available on order');
+        } else if (html.includes('Ten produkt jest niedostępny')) {
+          availability = 'Niedostępny';
+          console.log('[SCRAPER] Product page shows unavailable');
+        }
+
+        // Make sure image URL is absolute
+        if (imageUrl && !imageUrl.startsWith('http')) {
+          imageUrl = `https://jakobczak.pl${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+        }
+      } else {
+        console.error(`[SCRAPER] Scrape failed: ${scrapeResponse.status}`);
       }
     }
 
@@ -117,7 +177,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: !!(imageUrl || availability),
         imageUrl, 
-        availability 
+        availability,
+        productUrl
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
