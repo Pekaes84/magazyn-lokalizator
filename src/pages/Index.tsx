@@ -12,7 +12,7 @@ import {
   useDeleteInventory,
 } from "@/hooks/useInventoryMutations";
 import { Button } from "@/components/ui/button";
-import { Plus, LogOut } from "lucide-react";
+import { Plus, LogOut, Pencil, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const Index = () => {
@@ -136,7 +136,7 @@ const Index = () => {
                   Tryb Administratora aktywny
                 </span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button
                   onClick={() => {
                     setEditingItem(null);
@@ -147,6 +147,33 @@ const Index = () => {
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Dodaj towar
+                </Button>
+                <Button
+                  onClick={() => {
+                    toast({
+                      title: "Zmiana lokalizacji",
+                      description: "Wyszukaj produkt i kliknij przycisk 'Zmień lokalizację' przy wybranym produkcie",
+                    });
+                  }}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Zmień lokalizację
+                </Button>
+                <Button
+                  onClick={() => {
+                    toast({
+                      title: "Usuwanie towaru",
+                      description: "Wyszukaj produkt i kliknij przycisk 'Usuń' przy wybranym produkcie",
+                    });
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Usuń towar
                 </Button>
                 <Button
                   onClick={handleAdminClick}
