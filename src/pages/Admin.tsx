@@ -1,13 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { z } from 'zod';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, ArrowLeft, Shield, ShieldCheck, ShieldX, Users } from 'lucide-react';
+import { Loader2, ArrowLeft, Shield, ShieldCheck, ShieldX, Users, UserPlus } from 'lucide-react';
 import logo from '@/assets/logo.png';
+
+const newUserSchema = z.object({
+  email: z.string().trim().email({ message: 'Nieprawidłowy adres email' }),
+  password: z.string().min(6, { message: 'Hasło musi mieć minimum 6 znaków' }),
+});
 
 interface UserWithRole {
   id: string;
@@ -18,11 +26,13 @@ interface UserWithRole {
 
 export default function Admin() {
   const navigate = useNavigate();
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, loading, signUp } = useAuth();
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
-
+  const [newEmail, setNewEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
   useEffect(() => {
     if (!loading) {
       if (!user) {
@@ -123,6 +133,45 @@ export default function Admin() {
     }
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const result = newUserSchema.safeParse({ email: newEmail, password: newPassword });
+    if (!result.success) {
+      toast({
+        title: 'Błąd walidacji',
+        description: result.error.errors[0].message,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsCreating(true);
+    const { error } = await signUp(newEmail, newPassword);
+    setIsCreating(false);
+
+    if (error) {
+      let message = 'Błąd tworzenia użytkownika';
+      if (error.message.includes('User already registered')) {
+        message = 'Użytkownik z tym adresem email już istnieje';
+      }
+      toast({
+        title: 'Błąd',
+        description: message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Użytkownik utworzony',
+        description: `Konto dla ${newEmail} zostało utworzone`,
+      });
+      setNewEmail('');
+      setNewPassword('');
+      // Refresh users list after a short delay
+      setTimeout(() => fetchUsers(), 1000);
+    }
+  };
+
   if (loading || !isAdmin) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -155,7 +204,59 @@ export default function Admin() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 space-y-6">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <UserPlus className="w-6 h-6 text-primary" />
+              <div>
+                <CardTitle>Dodaj nowego użytkownika</CardTitle>
+                <CardDescription>
+                  Utwórz konto dla nowego pracownika
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleCreateUser} className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="new-email">Email</Label>
+                <Input
+                  id="new-email"
+                  type="email"
+                  placeholder="email@firma.pl"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  required
+                  disabled={isCreating}
+                />
+              </div>
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="new-password">Hasło</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  placeholder="Minimum 6 znaków"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  disabled={isCreating}
+                />
+              </div>
+              <div className="flex items-end">
+                <Button type="submit" disabled={isCreating}>
+                  {isCreating ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <UserPlus className="w-4 h-4 mr-2" />
+                  )}
+                  Utwórz
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
