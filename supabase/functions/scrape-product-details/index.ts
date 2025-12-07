@@ -44,7 +44,7 @@ serve(async (req) => {
         query: `site:jakobczak.pl ${searchTerm}`,
         limit: 3,
         scrapeOptions: {
-          formats: ['markdown', 'html'],
+          formats: ['html'],
         }
       }),
     });
@@ -97,7 +97,7 @@ serve(async (req) => {
         body: JSON.stringify({
           url: productUrl,
           formats: ['html'],
-          waitFor: 2000, // Wait for JS to load
+          waitFor: 3000, // Wait for JS to load
         }),
       });
 
@@ -107,59 +107,81 @@ serve(async (req) => {
         
         console.log(`[SCRAPER] Scraped ${html.length} bytes of HTML`);
 
-        // Extract main product image from HTML
-        // Look for og:image meta tag first (most reliable)
-        const ogImageMatch = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i) ||
-                            html.match(/<meta\s+content="([^"]+)"\s+property="og:image"/i);
-        if (ogImageMatch) {
-          imageUrl = ogImageMatch[1];
-          console.log(`[SCRAPER] Found og:image: ${imageUrl}`);
+        // Extract main product image - jakobczak.pl uses this pattern:
+        // <img class="photo innerzoom productimg" src="https://jakobczak.pl/environment/cache/images/500_500_productGfx_17111/KP032-2.webp">
+        const mainImgMatch = html.match(/<img[^>]+class="[^"]*photo[^"]*productimg[^"]*"[^>]+src="([^"]+)"/i) ||
+                            html.match(/<img[^>]+class="[^"]*productimg[^"]*photo[^"]*"[^>]+src="([^"]+)"/i);
+        
+        if (mainImgMatch && mainImgMatch[1]) {
+          imageUrl = mainImgMatch[1];
+          console.log(`[SCRAPER] Found main product image: ${imageUrl}`);
         }
 
-        // If no og:image, look for product image in HTML
+        // Try alternative: look for productdetailsimgsize container
         if (!imageUrl) {
-          // Look for main product image container
-          const productImgMatch = html.match(/<img[^>]+class="[^"]*mainimg[^"]*"[^>]+src="([^"]+)"/i) ||
-                                  html.match(/<img[^>]+id="[^"]*mainimg[^"]*"[^>]+src="([^"]+)"/i) ||
-                                  html.match(/<div[^>]+class="[^"]*product-image[^"]*"[^>]*>[\s\S]*?<img[^>]+src="([^"]+)"/i) ||
-                                  html.match(/<a[^>]+class="[^"]*mainimg[^"]*"[^>]+href="([^"]+)"/i);
-          
-          if (productImgMatch) {
-            imageUrl = productImgMatch[1];
-            // Handle data-src lazy loading
-            const dataSrcMatch = html.match(/<img[^>]+class="[^"]*mainimg[^"]*"[^>]+data-src="([^"]+)"/i);
-            if (dataSrcMatch && !dataSrcMatch[1].includes('1px')) {
-              imageUrl = dataSrcMatch[1];
-            }
-            console.log(`[SCRAPER] Found product image: ${imageUrl}`);
+          const containerMatch = html.match(/<div[^>]+class="[^"]*mainimg[^"]*productdetailsimgsize[^"]*"[^>]*>[\s\S]*?<img[^>]+src="([^"]+)"/i);
+          if (containerMatch && containerMatch[1]) {
+            imageUrl = containerMatch[1];
+            console.log(`[SCRAPER] Found image from mainimg container: ${imageUrl}`);
           }
         }
 
-        // If still no image, try finding any large product image
+        // Try gallery images as fallback
         if (!imageUrl) {
-          const imgMatches = html.matchAll(/<img[^>]+src="(https:\/\/jakobczak\.pl\/[^"]+\/products\/[^"]+)"/gi);
-          for (const match of imgMatches) {
-            if (!match[1].includes('1px') && !match[1].includes('thumbnail')) {
-              imageUrl = match[1];
-              console.log(`[SCRAPER] Found product image from products folder: ${imageUrl}`);
-              break;
-            }
+          const galleryMatch = html.match(/<a[^>]+class="gallery[^"]*current"[^>]+href="([^"]+)"/i);
+          if (galleryMatch && galleryMatch[1]) {
+            imageUrl = galleryMatch[1];
+            console.log(`[SCRAPER] Found image from gallery: ${imageUrl}`);
           }
         }
 
-        // Check availability
-        if (html.includes('Do koszyka') || html.includes('do koszyka') || html.includes('addtobasket')) {
-          availability = 'Dostępny';
-          console.log('[SCRAPER] Product is available (add to cart button found)');
-        } else if (html.includes('niedostępny') || html.includes('Niedostępny') || html.includes('brak w magazynie')) {
+        // Try any image in environment/cache/images with product ID
+        if (!imageUrl) {
+          const cacheImgMatch = html.match(/src="(https:\/\/jakobczak\.pl\/environment\/cache\/images\/[^"]+)"/i);
+          if (cacheImgMatch && cacheImgMatch[1] && !cacheImgMatch[1].includes('1px')) {
+            imageUrl = cacheImgMatch[1];
+            console.log(`[SCRAPER] Found cached image: ${imageUrl}`);
+          }
+        }
+
+        // Extract availability - jakobczak.pl uses:
+        // <span class="first">Dostępność:</span> <span class="second">duża ilość</span>
+        // or "Powiadom o dostępności" button for unavailable products
+        
+        // Check for "Powiadom o dostępności" (Notify about availability) - means UNAVAILABLE
+        if (html.includes('Powiadom o dostępności') || 
+            html.includes('powiadom o dostępności') ||
+            html.includes('Powiadom o dost')) {
           availability = 'Niedostępny';
-          console.log('[SCRAPER] Product is unavailable');
-        } else if (html.includes('na zamówienie') || html.includes('Na zamówienie')) {
-          availability = 'Na zamówienie';
-          console.log('[SCRAPER] Product is available on order');
-        } else if (html.includes('Ten produkt jest niedostępny')) {
+          console.log('[SCRAPER] Found "Powiadom o dostępności" - product unavailable');
+        }
+        // Check for "Ten produkt jest niedostępny"
+        else if (html.includes('Ten produkt jest niedostępny')) {
           availability = 'Niedostępny';
           console.log('[SCRAPER] Product page shows unavailable');
+        }
+        // Check for availability text pattern
+        else {
+          const availMatch = html.match(/<span[^>]+class="first"[^>]*>\s*Dostępność:\s*<\/span>\s*<span[^>]+class="second"[^>]*>\s*([^<]+)/i);
+          if (availMatch && availMatch[1]) {
+            const availText = availMatch[1].trim().toLowerCase();
+            console.log(`[SCRAPER] Found availability text: "${availText}"`);
+            
+            if (availText.includes('brak') || availText.includes('niedostępn') || availText === '0') {
+              availability = 'Niedostępny';
+            } else if (availText.includes('zamówien')) {
+              availability = 'Na zamówienie';
+            } else if (availText.includes('duża') || availText.includes('mała') || availText.includes('średnia') || 
+                       availText.includes('szt') || availText.includes('dostępn') || /\d+/.test(availText)) {
+              availability = 'Dostępny';
+            }
+          }
+          
+          // Double check with "Do koszyka" button
+          if (!availability && (html.includes('DO KOSZYKA') || html.includes('Do koszyka') || html.includes('addtobasket'))) {
+            availability = 'Dostępny';
+            console.log('[SCRAPER] Found "Do koszyka" button - product available');
+          }
         }
 
         // Make sure image URL is absolute
@@ -167,7 +189,8 @@ serve(async (req) => {
           imageUrl = `https://jakobczak.pl${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
         }
       } else {
-        console.error(`[SCRAPER] Scrape failed: ${scrapeResponse.status}`);
+        const errText = await scrapeResponse.text();
+        console.error(`[SCRAPER] Scrape failed: ${scrapeResponse.status} - ${errText}`);
       }
     }
 
