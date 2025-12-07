@@ -11,7 +11,7 @@ interface CreateInventoryData {
 }
 
 interface UpdateInventoryData {
-  id: string;
+  originalSymbol: string;
   Symbol: string;
   Nazwa?: string;
   Kontener?: string;
@@ -71,7 +71,7 @@ export function useUpdateInventory() {
           Regał: data.Regał || null,
           Półka: data.Półka || null,
         })
-        .eq("id", data.id)
+        .eq("Symbol", data.originalSymbol)
         .select()
         .single();
 

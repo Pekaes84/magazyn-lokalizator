@@ -68,7 +68,7 @@ const Index = () => {
     if (editingItem) {
       updateMutation.mutate(
         { 
-          id: editingItem.id, 
+          originalSymbol: editingItem.Symbol,
           Symbol: data.symbol,
           Nazwa: data.nazwa,
           Kontener: data.kontener,
