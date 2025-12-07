@@ -27,7 +27,7 @@ interface UserWithRole {
 
 export default function Admin() {
   const navigate = useNavigate();
-  const { user, isAdmin, loading, signUp } = useAuth();
+  const { user, isAdmin, loading } = useAuth();
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
@@ -148,47 +148,37 @@ export default function Admin() {
       return;
     }
 
-    // Generate internal email from username
-    const generatedEmail = `${newUsername.toLowerCase().replace(/\s+/g, '_')}@internal.local`;
-
     setIsCreating(true);
-    const { error, data } = await signUp(generatedEmail, newPassword);
 
-    if (error) {
-      setIsCreating(false);
-      let message = 'Błąd tworzenia użytkownika';
-      if (error.message.includes('User already registered')) {
-        message = 'Użytkownik o tej nazwie już istnieje';
+    try {
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: { username: newUsername, password: newPassword }
+      });
+
+      if (error) throw error;
+
+      if (data?.error) {
+        throw new Error(data.error);
       }
+
+      toast({
+        title: 'Użytkownik utworzony',
+        description: `Konto dla ${newUsername} zostało utworzone`,
+      });
+      setNewUsername('');
+      setNewPassword('');
+      // Refresh users list after a short delay
+      setTimeout(() => fetchUsers(), 1000);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Błąd tworzenia użytkownika';
       toast({
         title: 'Błąd',
         description: message,
         variant: 'destructive',
       });
-      return;
+    } finally {
+      setIsCreating(false);
     }
-
-    // Update profile with username
-    if (data?.user) {
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ username: newUsername })
-        .eq('id', data.user.id);
-
-      if (updateError) {
-        console.error('Error setting username:', updateError);
-      }
-    }
-
-    setIsCreating(false);
-    toast({
-      title: 'Użytkownik utworzony',
-      description: `Konto dla ${newUsername} zostało utworzone`,
-    });
-    setNewUsername('');
-    setNewPassword('');
-    // Refresh users list after a short delay
-    setTimeout(() => fetchUsers(), 1000);
   };
 
   if (loading || !isAdmin) {

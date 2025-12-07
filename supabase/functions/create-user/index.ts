@@ -8,14 +8,17 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { email, password, username } = await req.json()
+    const { password, username } = await req.json()
 
-    if (!email || !password || !username) {
+    if (!password || !username) {
       return new Response(
-        JSON.stringify({ error: 'Email, password and username are required' }),
+        JSON.stringify({ error: 'Password and username are required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    // Generate internal email from username
+    const email = `${username.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')}@internal.local`
 
     // Create admin client with service role key
     const supabaseAdmin = createClient(
