@@ -25,6 +25,7 @@ const Index = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<InventoryItem | null>(null);
+  const [selectionMode, setSelectionMode] = useState<"edit" | "delete" | null>(null);
 
   const { data: items = [], isLoading } = useInventorySearch(searchTerm);
   const createMutation = useCreateInventory();
@@ -57,11 +58,21 @@ const Index = () => {
   const handleEdit = (item: InventoryItem) => {
     setEditingItem(item);
     setShowFormDialog(true);
+    setSelectionMode(null);
   };
 
   const handleDelete = (item: InventoryItem) => {
     setDeletingItem(item);
     setShowDeleteDialog(true);
+    setSelectionMode(null);
+  };
+
+  const handleItemClick = (item: InventoryItem) => {
+    if (selectionMode === "edit") {
+      handleEdit(item);
+    } else if (selectionMode === "delete") {
+      handleDelete(item);
+    }
   };
 
   const handleSave = (data: { symbol: string; nazwa: string; kontener: string; regal: string; polka: string }) => {
@@ -163,30 +174,53 @@ const Index = () => {
             </Button>
             <Button
               onClick={() => {
-                toast({
-                  title: "Zmiana lokalizacji",
-                  description: "Wyszukaj produkt i rozwiń go, aby zmienić lokalizację",
-                });
+                if (selectionMode === "edit") {
+                  setSelectionMode(null);
+                } else {
+                  setSelectionMode("edit");
+                  toast({
+                    title: "Tryb edycji",
+                    description: "Kliknij na produkt z listy, aby zmienić jego lokalizację",
+                  });
+                }
               }}
-              variant="outline"
+              variant={selectionMode === "edit" ? "default" : "outline"}
             >
               <Pencil className="w-4 h-4 mr-2" />
-              Zmień lokalizację
+              {selectionMode === "edit" ? "Anuluj edycję" : "Zmień lokalizację"}
             </Button>
             <Button
               onClick={() => {
-                toast({
-                  title: "Usuwanie towaru",
-                  description: "Wyszukaj produkt i rozwiń go, aby usunąć",
-                });
+                if (selectionMode === "delete") {
+                  setSelectionMode(null);
+                } else {
+                  setSelectionMode("delete");
+                  toast({
+                    title: "Tryb usuwania",
+                    description: "Kliknij na produkt z listy, aby go usunąć",
+                  });
+                }
               }}
-              variant="outline"
-              className="text-destructive hover:text-destructive"
+              variant={selectionMode === "delete" ? "destructive" : "outline"}
+              className={selectionMode !== "delete" ? "text-destructive hover:text-destructive" : ""}
             >
               <Trash2 className="w-4 h-4 mr-2" />
-              Usuń towar
+              {selectionMode === "delete" ? "Anuluj usuwanie" : "Usuń towar"}
             </Button>
           </div>
+
+          {/* Selection mode indicator */}
+          {selectionMode && (
+            <div className={`text-center py-2 px-4 rounded-lg mb-4 ${
+              selectionMode === "edit" 
+                ? "bg-primary/10 text-primary" 
+                : "bg-destructive/10 text-destructive"
+            }`}>
+              {selectionMode === "edit" 
+                ? "Wybierz produkt do edycji" 
+                : "Wybierz produkt do usunięcia"}
+            </div>
+          )}
 
           {/* Results */}
           <InventoryList
@@ -196,6 +230,8 @@ const Index = () => {
             isAdmin={true}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            selectionMode={selectionMode}
+            onItemClick={handleItemClick}
           />
         </div>
       </main>
