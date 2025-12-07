@@ -144,43 +144,71 @@ serve(async (req) => {
           }
         }
 
-        // Extract availability - jakobczak.pl uses:
-        // <span class="first">Dostępność:</span> <span class="second">duża ilość</span>
-        // or "Powiadom o dostępności" button for unavailable products
-        
-        // Check for "Powiadom o dostępności" (Notify about availability) - means UNAVAILABLE
-        if (html.includes('Powiadom o dostępności') || 
-            html.includes('powiadom o dostępności') ||
-            html.includes('Powiadom o dost')) {
-          availability = 'Niedostępny';
-          console.log('[SCRAPER] Found "Powiadom o dostępności" - product unavailable');
+        // IMPROVED AVAILABILITY DETECTION
+        // Priority 1: Check for explicit availability text like "Dostępność: duża ilość"
+        const availMatch = html.match(/<span[^>]+class="first"[^>]*>\s*Dostępność:\s*<\/span>\s*<span[^>]+class="second"[^>]*>\s*([^<]+)/i);
+        if (availMatch && availMatch[1]) {
+          const availText = availMatch[1].trim().toLowerCase();
+          console.log(`[SCRAPER] Found availability text: "${availText}"`);
+          
+          if (availText.includes('brak') || availText.includes('niedostępn') || availText === '0') {
+            availability = 'Niedostępny';
+          } else if (availText.includes('zamówien')) {
+            availability = 'Na zamówienie';
+          } else if (availText.includes('duża') || availText.includes('mała') || availText.includes('średnia') || 
+                     availText.includes('szt') || availText.includes('dostępn') || /\d+/.test(availText)) {
+            availability = 'Dostępny';
+          }
         }
-        // Check for "Ten produkt jest niedostępny"
-        else if (html.includes('Ten produkt jest niedostępny')) {
-          availability = 'Niedostępny';
-          console.log('[SCRAPER] Product page shows unavailable');
-        }
-        // Check for availability text pattern
-        else {
-          const availMatch = html.match(/<span[^>]+class="first"[^>]*>\s*Dostępność:\s*<\/span>\s*<span[^>]+class="second"[^>]*>\s*([^<]+)/i);
-          if (availMatch && availMatch[1]) {
-            const availText = availMatch[1].trim().toLowerCase();
-            console.log(`[SCRAPER] Found availability text: "${availText}"`);
-            
-            if (availText.includes('brak') || availText.includes('niedostępn') || availText === '0') {
-              availability = 'Niedostępny';
-            } else if (availText.includes('zamówien')) {
-              availability = 'Na zamówienie';
-            } else if (availText.includes('duża') || availText.includes('mała') || availText.includes('średnia') || 
-                       availText.includes('szt') || availText.includes('dostępn') || /\d+/.test(availText)) {
+
+        // Priority 2: Check for active "Do koszyka" button (not hidden with "none" class)
+        // Look for button.addtobasket that is NOT inside a container with class "none"
+        if (!availability) {
+          // Check if there's an active addtobasket button in form-basket
+          const formBasketMatch = html.match(/<form[^>]+class="form-basket"[^>]*>[\s\S]*?<fieldset[^>]+class="addtobasket-container"[^>]*>[\s\S]*?<button[^>]+class="addtobasket[^"]*"[^>]*>/i);
+          if (formBasketMatch) {
+            // Check if this form has an ACTIVE addtobasket (not hidden)
+            const basketSection = html.match(/<fieldset[^>]+class="addtobasket-container"[^>]*>[\s\S]*?<\/fieldset>/i);
+            if (basketSection && !basketSection[0].includes('class="none"') && !basketSection[0].includes('class="hide"')) {
               availability = 'Dostępny';
+              console.log('[SCRAPER] Found active "Do koszyka" button - product available');
             }
           }
-          
-          // Double check with "Do koszyka" button
-          if (!availability && (html.includes('DO KOSZYKA') || html.includes('Do koszyka') || html.includes('addtobasket'))) {
+        }
+
+        // Priority 3: Check for VISIBLE "Powiadom o dostępności" button (unavailable)
+        // The button is hidden when product is available: fieldset class="availability-notifier-container none"
+        if (!availability) {
+          // Look for availability-notifier that is NOT hidden (doesn't have "none" class)
+          const notifierMatch = html.match(/<fieldset[^>]+class="availability-notifier-container([^"]*)"[^>]*>/i);
+          if (notifierMatch) {
+            const classValue = notifierMatch[1] || '';
+            // If the class doesn't contain "none" or "hide", the button is visible = product unavailable
+            if (!classValue.includes('none') && !classValue.includes('hide')) {
+              availability = 'Niedostępny';
+              console.log('[SCRAPER] Found VISIBLE "Powiadom o dostępności" - product unavailable');
+            } else {
+              console.log('[SCRAPER] "Powiadom o dostępności" button is hidden - product is available');
+            }
+          }
+        }
+
+        // Priority 4: Check for schema.org InStock indicator
+        if (!availability) {
+          if (html.includes('schema.org/InStock')) {
             availability = 'Dostępny';
-            console.log('[SCRAPER] Found "Do koszyka" button - product available');
+            console.log('[SCRAPER] Found schema.org/InStock - product available');
+          } else if (html.includes('schema.org/OutOfStock')) {
+            availability = 'Niedostępny';
+            console.log('[SCRAPER] Found schema.org/OutOfStock - product unavailable');
+          }
+        }
+
+        // Priority 5: Check for explicit unavailable message
+        if (!availability) {
+          if (html.includes('Ten produkt jest niedostępny')) {
+            availability = 'Niedostępny';
+            console.log('[SCRAPER] Product page shows unavailable message');
           }
         }
 
