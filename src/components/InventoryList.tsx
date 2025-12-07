@@ -9,6 +9,8 @@ interface InventoryListProps {
   isAdmin: boolean;
   onEdit?: (item: InventoryItem) => void;
   onDelete?: (item: InventoryItem) => void;
+  selectionMode?: "edit" | "delete" | null;
+  onItemClick?: (item: InventoryItem) => void;
 }
 
 export function InventoryList({
@@ -18,6 +20,8 @@ export function InventoryList({
   isAdmin,
   onEdit,
   onDelete,
+  selectionMode,
+  onItemClick,
 }: InventoryListProps) {
   if (isLoading) {
     return (
@@ -94,6 +98,8 @@ export function InventoryList({
             isAdmin={isAdmin}
             onEdit={onEdit}
             onDelete={onDelete}
+            selectionMode={selectionMode}
+            onItemClick={onItemClick}
           />
         </div>
       ))}

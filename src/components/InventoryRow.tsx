@@ -10,6 +10,8 @@ interface InventoryRowProps {
   isAdmin: boolean;
   onEdit?: (item: InventoryItem) => void;
   onDelete?: (item: InventoryItem) => void;
+  selectionMode?: "edit" | "delete" | null;
+  onItemClick?: (item: InventoryItem) => void;
 }
 function buildLocation(item: InventoryItem): string {
   const parts = [item.Kontener, item.Regał, item.Półka].filter(Boolean);
@@ -19,7 +21,9 @@ export function InventoryRow({
   item,
   isAdmin,
   onEdit,
-  onDelete
+  onDelete,
+  selectionMode,
+  onItemClick
 }: InventoryRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const {
@@ -39,8 +43,20 @@ export function InventoryRow({
         {productDetails.availability}
       </Badge>;
   };
-  return <div className="border border-border rounded-lg overflow-hidden bg-card transition-all hover:shadow-md">
-      <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => setIsExpanded(!isExpanded)}>
+  const handleRowClick = () => {
+    if (selectionMode && onItemClick) {
+      onItemClick(item);
+    } else {
+      setIsExpanded(!isExpanded);
+    }
+  };
+
+  return <div className={`border rounded-lg overflow-hidden bg-card transition-all hover:shadow-md ${
+    selectionMode === "edit" ? "border-primary cursor-pointer ring-1 ring-primary/20" :
+    selectionMode === "delete" ? "border-destructive cursor-pointer ring-1 ring-destructive/20" :
+    "border-border"
+  }`}>
+      <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50 transition-colors" onClick={handleRowClick}>
         <div className="flex items-center gap-4 flex-1 min-w-0">
           <div className="flex-shrink-0">
             <Package className="w-5 h-5 text-primary" />
