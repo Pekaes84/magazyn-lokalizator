@@ -23,6 +23,14 @@ export function useInventorySearch(searchTerm: string) {
       console.log("Searching for:", searchTerm);
       
       try {
+        // First, let's check if we can access the table at all
+        const { data: testData, error: testError } = await externalSupabase
+          .from("Lokalizacje")
+          .select("*")
+          .limit(5);
+        
+        console.log("Table access test:", { testData, testError });
+        
         const { data, error } = await externalSupabase
           .from("Lokalizacje")
           .select("*")
