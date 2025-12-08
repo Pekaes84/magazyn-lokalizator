@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { externalSupabase } from "@/lib/externalSupabase";
 import { toast } from "@/hooks/use-toast";
 
 interface CreateInventoryData {
@@ -24,11 +24,11 @@ export function useCreateInventory() {
 
   return useMutation({
     mutationFn: async (data: CreateInventoryData) => {
-      const { data: result, error } = await supabase
+      const { data: result, error } = await externalSupabase
         .from("Lokalizacje")
         .insert({
           Symbol: data.Symbol,
-          Nama: data.Nazwa || null,
+          Nazwa: data.Nazwa || null,
           Kontener: data.Kontener || null,
           Regał: data.Regał || null,
           Półka: data.Półka || null,
@@ -62,7 +62,7 @@ export function useUpdateInventory() {
 
   return useMutation({
     mutationFn: async (data: UpdateInventoryData) => {
-      const { error, count } = await supabase
+      const { error, count } = await externalSupabase
         .from("Lokalizacje")
         .update({
           Symbol: data.Symbol,
@@ -99,7 +99,7 @@ export function useDeleteInventory() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("Lokalizacje").delete().eq("id", id);
+      const { error } = await externalSupabase.from("Lokalizacje").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
