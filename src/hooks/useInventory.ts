@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { externalSupabase } from "@/lib/externalSupabase";
 
 export interface InventoryItem {
   id: string;
@@ -19,7 +19,7 @@ export function useInventorySearch(searchTerm: string) {
         return [];
       }
 
-      const { data, error } = await supabase
+      const { data, error } = await externalSupabase
         .from("Lokalizacje")
         .select("*")
         .or(`Symbol.ilike.%${searchTerm}%,Nazwa.ilike.%${searchTerm}%`)
@@ -41,7 +41,7 @@ export function useInventoryById(id: string) {
   return useQuery({
     queryKey: ["inventory", "single", id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await externalSupabase
         .from("Lokalizacje")
         .select("*")
         .eq("id", id)
