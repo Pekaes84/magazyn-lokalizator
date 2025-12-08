@@ -18,12 +18,17 @@ export function useInventorySearch(searchTerm: string) {
         return [];
       }
 
+      // First, let's try to get all items to debug
+      console.log("Searching for:", searchTerm);
+      
       const { data, error } = await externalSupabase
         .from("Lokalizacje")
         .select("*")
         .or(`Symbol.ilike.%${searchTerm}%,Nazwa.ilike.%${searchTerm}%`)
         .order("Symbol")
         .limit(50);
+
+      console.log("Search results:", data, "Error:", error);
 
       if (error) {
         console.error("Error fetching inventory:", error);
@@ -33,6 +38,22 @@ export function useInventorySearch(searchTerm: string) {
       return data as InventoryItem[];
     },
     enabled: searchTerm.length >= 2,
+  });
+}
+
+// Debug function to check if table has any data
+export function useInventoryDebug() {
+  return useQuery({
+    queryKey: ["inventory-debug"],
+    queryFn: async () => {
+      const { data, error } = await externalSupabase
+        .from("Lokalizacje")
+        .select("*")
+        .limit(5);
+
+      console.log("Debug - First 5 items:", data, "Error:", error);
+      return { data, error };
+    },
   });
 }
 
