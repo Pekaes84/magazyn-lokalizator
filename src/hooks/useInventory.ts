@@ -16,22 +16,32 @@ export function useInventorySearch(searchTerm: string) {
     queryKey: ["inventory", searchTerm],
     queryFn: async () => {
       if (!searchTerm || searchTerm.length < 2) {
+        console.log("Search term too short:", searchTerm);
         return [];
       }
 
-      const { data, error } = await externalSupabase
-        .from("Lokalizacje")
-        .select("*")
-        .or(`Symbol.ilike.%${searchTerm}%,Nazwa.ilike.%${searchTerm}%`)
-        .order("Symbol")
-        .limit(50);
+      console.log("Searching for:", searchTerm);
+      
+      try {
+        const { data, error } = await externalSupabase
+          .from("Lokalizacje")
+          .select("*")
+          .or(`Symbol.ilike.%${searchTerm}%,Nazwa.ilike.%${searchTerm}%`)
+          .order("Symbol")
+          .limit(50);
 
-      if (error) {
-        console.error("Error fetching inventory:", error);
-        throw error;
+        console.log("Search result:", { data, error });
+
+        if (error) {
+          console.error("Error fetching inventory:", error);
+          throw error;
+        }
+
+        return data as InventoryItem[];
+      } catch (err) {
+        console.error("Unexpected error during search:", err);
+        throw err;
       }
-
-      return data as InventoryItem[];
     },
     enabled: searchTerm.length >= 2,
   });
