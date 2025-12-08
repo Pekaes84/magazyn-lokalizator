@@ -21,7 +21,6 @@ const newUserSchema = z.object({
 interface UserWithRole {
   id: string;
   username: string | null;
-  email: string;
   role: 'admin' | 'user';
   created_at: string;
 }
@@ -63,7 +62,7 @@ export default function Admin() {
       // Fetch profiles with roles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, email, username, created_at');
+        .select('id, username, created_at');
 
       if (profilesError) throw profilesError;
 
@@ -78,7 +77,6 @@ export default function Admin() {
         return {
           id: profile.id,
           username: profile.username,
-          email: profile.email || 'Brak emaila',
           role: (userRole?.role as 'admin' | 'user') || 'user',
           created_at: profile.created_at,
         };
