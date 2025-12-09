@@ -8,8 +8,7 @@ import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useInventorySearch, InventoryItem } from "@/hooks/useInventory";
 import { useCreateInventory, useUpdateInventory, useDeleteInventory } from "@/hooks/useInventoryMutations";
 import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 const Index = () => {
   const navigate = useNavigate();
@@ -119,7 +118,16 @@ const Index = () => {
     return null;
   }
   return <div className="min-h-screen bg-background">
-      <Header isAdmin={isAdmin} onAdminClick={() => navigate('/admin')} onSignOut={handleSignOut} userEmail={user.email} />
+      <Header 
+        isAdmin={isAdmin} 
+        onAdminClick={() => navigate('/admin')} 
+        onSignOut={handleSignOut} 
+        onAddItem={() => {
+          setEditingItem(null);
+          setShowFormDialog(true);
+        }}
+        userEmail={user.email} 
+      />
 
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
@@ -136,18 +144,6 @@ const Index = () => {
           {/* Search */}
           <div className="mb-8">
             <SearchBar value={searchTerm} onChange={setSearchTerm} />
-          </div>
-
-          {/* Action Buttons - visible for all logged in users */}
-          <div className="flex items-center justify-center gap-3 mb-6 flex-wrap">
-            <Button onClick={() => {
-            setEditingItem(null);
-            setShowFormDialog(true);
-          }} className="shadow-burgundy">
-              <Plus className="w-4 h-4 mr-2" />
-              Dodaj towar
-            </Button>
-            
           </div>
 
           {/* Results */}
